@@ -1,4 +1,0 @@
-[submodule "agricom-frontend"]
-	path = agricom-frontend
-	url = https://github.com/Farah2332004-ux/agricom-frontend-project.git
-	branch = main
