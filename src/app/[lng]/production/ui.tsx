@@ -1,60 +1,82 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import { create } from "zustand";
 
-export type IndicatorKey = "production" | "demand" | "loss" | "sort"
+export type IndicatorKey = "weather" | "production" | "demand" | "loss" | "sort";
 
-type UIState = {
-  crop: string
-  selectedPlots: string[]
-  selectedTasks: string[]
-  indicators: Record<IndicatorKey, boolean>
-  weekStart: number
-  window: number
-  setCrop: (v: string) => void
-  setSelectedPlots: (v: string[]) => void
-  setSelectedTasks: (v: string[]) => void
-  toggleIndicator: (k: IndicatorKey, v: boolean) => void
-  setWeekStart: (n: number) => void
-}
+type ProductionUI = {
+  // crop + method
+  crop: string;
+  setCrop: (c: string) => void;
+  method: string | null;
+  setMethod: (m: string | null) => void;
 
-const Ctx = React.createContext<UIState | null>(null)
+  // multi-crop select + hide all
+  selectedCrops: string[];
+  setSelectedCrops: (crops: string[]) => void;
+  hideAllCrops: boolean;
+  setHideAllCrops: (v: boolean) => void;
 
-export function ProductionUIProvider({ children }: { children: React.ReactNode }) {
-  const [crop, setCrop] = React.useState("Broccoli")
-  const [selectedPlots, setSelectedPlots] = React.useState<string[]>([])
-  const [selectedTasks, setSelectedTasks] = React.useState<string[]>([])
-  const [indicators, setIndicators] = React.useState<Record<IndicatorKey, boolean>>({
-    production: true,
-    demand: false,
-    loss: false,
-    sort: false,
-  })
-  const [weekStart, setWeekStart] = React.useState(12)
-  const window = 16
+  // plots select + hide all
+  selectedPlots: string[]; // e.g. ["P1.1","P1.2"]
+  setSelectedPlots: (plots: string[]) => void;
+  hideAllPlots: boolean;
+  setHideAllPlots: (v: boolean) => void;
 
-  const toggleIndicator = (k: IndicatorKey, v: boolean) =>
-    setIndicators((p) => ({ ...p, [k]: v }))
+  // tasks select + hide all
+  selectedTasks: string[]; // keys like "pruning"
+  setSelectedTasks: (t: string[]) => void;
+  hideAllTasks: boolean;
+  setHideAllTasks: (v: boolean) => void;
 
-  const value: UIState = {
-    crop,
-    selectedPlots,
-    selectedTasks,
-    indicators,
-    weekStart,
-    window,
-    setCrop,
-    setSelectedPlots,
-    setSelectedTasks,
-    toggleIndicator,
-    setWeekStart,
-  }
+  // weeks
+  weekStart: number;
+  window: number;
+  setWeekStart: (w: number) => void;
+  setWindow: (n: number) => void;
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-}
+  // indicators + sorting order
+  indicators: Record<IndicatorKey, boolean>;
+  toggleIndicator: (k: IndicatorKey, v: boolean) => void;
+  indicatorOrder: IndicatorKey[];
+  setIndicatorOrder: (o: IndicatorKey[]) => void;
+};
 
-export function useProductionUI() {
-  const v = React.useContext(Ctx)
-  if (!v) throw new Error("useProductionUI must be used inside <ProductionUIProvider>")
-  return v
-}
+export const useProductionUI = create<ProductionUI>((set, get) => ({
+  // defaults
+  crop: "Broccoli",
+  setCrop: (crop) => set({ crop }),
+
+  method: null,
+  setMethod: (method) => set({ method }),
+
+  selectedCrops: [],
+  setSelectedCrops: (selectedCrops) => set({ selectedCrops }),
+  hideAllCrops: false,
+  setHideAllCrops: (v) => set({ hideAllCrops: v }),
+
+  selectedPlots: [],
+  setSelectedPlots: (selectedPlots) => set({ selectedPlots }),
+  hideAllPlots: false,
+  setHideAllPlots: (v) => set({ hideAllPlots: v }),
+
+  selectedTasks: [],
+  setSelectedTasks: (t) =>
+    set({
+      selectedTasks: t,
+      // don't force-hide unless explicitly requested via setHideAllTasks
+      hideAllTasks: get().hideAllTasks && t.length === 0 ? true : false,
+    }),
+  hideAllTasks: false,
+  setHideAllTasks: (v) => set({ hideAllTasks: v }),
+
+  weekStart: 12,
+  window: 16,
+  setWeekStart: (w) => set({ weekStart: w }),
+  setWindow: (n) => set({ window: n }),
+
+  indicators: { weather: false, production: true, demand: true, loss: true, sort: false },
+  toggleIndicator: (k, v) => set({ indicators: { ...get().indicators, [k]: v } }),
+  indicatorOrder: ["production", "demand", "loss"],
+  setIndicatorOrder: (o) => set({ indicatorOrder: o }),
+}));

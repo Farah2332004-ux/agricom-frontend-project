@@ -1,42 +1,40 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   CloudSun, ShoppingCart, Trash2, ArrowUpDown,
-  Scissors, Hammer, Droplets, Wheat, Shovel, FlaskConical, Shield, Sprout,
-  MinusCircle,
-} from "lucide-react"
+  Scissors, Hammer, Droplets, Wheat, Shovel, FlaskConical, Shield, Sprout, MinusCircle,
+  Filter as FilterIcon, ClipboardList, MapPin,
+} from "lucide-react";
 
-import PlotsDropdown, { type PlotNode } from "../molecules/PlotsDropdown"
-import CropsDropdown from "../molecules/CropsDropdown"
-import TasksDropdown from "../molecules/TasksDropdown"
-import IndicatorToggle from "../molecules/IndicatorToggle"
-import { useProductionUI } from "../../production/ui"
-
-export type IndicatorKey = "weather" | "production" | "demand" | "loss" | "sort"
+import PlotsDropdown, { type PlotNode } from "../molecules/PlotsDropdown";
+import CropsDropdown from "../molecules/CropsDropdown";
+import TasksDropdown, { type TaskItem } from "../molecules/TasksDropdown";
+import IndicatorToggle from "../molecules/IndicatorToggle";
+import { useProductionUI } from "../../production/ui";
 
 export default function ProductionFilters() {
-  const ui = useProductionUI()
+  const ui = useProductionUI();
 
-  // ---- plots (now from UI store)
+  // Plots
   const plotItems: PlotNode[] = [
-    { country: "Italy", city: "Rome",   plot: "P1.1", id: "it-rome-p1-1" },
-    { country: "Italy", city: "Rome",   plot: "P1.2", id: "it-rome-p1-2" },
-    { country: "Italy", city: "Milan",  plot: "P2.1", id: "it-mil-p2-1" },
-    { country: "Spain", city: "Seville",plot: "P3.1", id: "es-sev-p3-1" },
-    { country: "Spain", city: "Seville",plot: "P3.2", id: "es-sev-p3-2" },
-  ]
+    { country: "Italy", city: "Rome",    plot: "P1.1", id: "it-rome-p1-1" },
+    { country: "Italy", city: "Rome",    plot: "P1.2", id: "it-rome-p1-2" },
+    { country: "Italy", city: "Milan",   plot: "P2.1", id: "it-mil-p2-1" },
+    { country: "Spain", city: "Seville", plot: "P3.1", id: "es-sev-p3-1" },
+    { country: "Spain", city: "Seville", plot: "P3.2", id: "es-sev-p3-2" },
+  ];
+  const allPlotCodes = Array.from(new Set(plotItems.map(p => p.plot))); // ["P1.1","P1.2","P2.1","P3.1","P3.2"]
 
-  // ---- crops (keep local pair for method; sync crop name to UI store)
-  const [cropSel, setCropSel] = React.useState<{ crop: string | null; method: string | null }>({
-    crop: "Broccoli",
-    method: "Conventional",
-  })
-  const crops = ["Tomato", "Broccoli", "Potato", "Cabbage", "Onion", "Spinach"]
-  const methods = ["Organic","Conventional","Hydroponic","Urban","Aquaponic","Tunnel","GreenHouse","Open Field","Vertical Farming"]
+  // Crops
+  const crops = ["Tomato", "Broccoli", "Potato", "Cabbage", "Onion", "Spinach"];
+  const methods = [
+    "Organic","Conventional","Hydroponic","Urban","Aquaponic",
+    "Tunnel","GreenHouse","Open Field","Vertical Farming",
+  ];
 
-  // ---- tasks (from UI store)
-  const tasks = [
+  // Tasks
+  const tasks: TaskItem[] = [
     { label: "Pruning",          value: "pruning",        icon: Scissors },
     { label: "Staking",          value: "staking",        icon: Hammer },
     { label: "Irrigation",       value: "irrigation",     icon: Droplets },
@@ -46,44 +44,81 @@ export default function ProductionFilters() {
     { label: "Soil Preparation", value: "soil-prep",      icon: Shovel },
     { label: "Fertilization",    value: "fertilization",  icon: FlaskConical },
     { label: "Protection",       value: "protection",     icon: Shield },
-  ] as const
+  ];
+
+  // Clear/Select-All handlers
+  const clearTasks = () => { ui.setSelectedTasks([]); ui.setHideAllTasks(true); };
+  const selectAllTasks = () => { ui.setSelectedTasks(tasks.map(t => t.value)); ui.setHideAllTasks(false); };
+
+  const clearCrops = () => { ui.setSelectedCrops([]); ui.setMethod(null); ui.setHideAllCrops(true); };
+  const selectAllCrops = () => { ui.setSelectedCrops(crops); ui.setHideAllCrops(false); };
+
+  const clearPlots = () => { ui.setSelectedPlots([]); ui.setHideAllPlots(true); };
+  const selectAllPlots = () => { ui.setSelectedPlots(allPlotCodes); ui.setHideAllPlots(false); };
 
   return (
     <section className="mb-3 w-full">
-      {/* Left = Filters, Right = Indicators */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-start">
-        {/* Filters */}
+        {/* Left: Filters */}
         <div className="flex flex-col gap-1">
-          <span className="text-sm leading-none text-muted-foreground">Filter By:</span>
-          <div className="flex flex-wrap items-center gap-4">
-            <PlotsDropdown
-              items={plotItems}
-              value={ui.selectedPlots}
-              onChange={ui.setSelectedPlots}
-            />
+          <span className="inline-flex items-center gap-2 text-sm leading-none text-muted-foreground">
+            <FilterIcon className="size-4" />
+            Filter By:
+          </span>
 
-            <CropsDropdown
-              crops={crops}
-              methods={methods}
-              value={cropSel}
-              onChange={(next) => {
-                setCropSel(next)
-                if (next.crop) ui.setCrop(next.crop)
-              }}
-            />
+          <div className="flex flex-wrap items-center gap-5">
+            {/* Plots */}
+            <div className="inline-flex items-center gap-2">
+              <MapPin className="size-4 text-[#02A78B]" />
+              <PlotsDropdown
+                items={plotItems}
+                value={ui.selectedPlots}
+                onChange={(next) => { ui.setSelectedPlots(next); ui.setHideAllPlots(false); }}
+                onClearAll={clearPlots}
+                onSelectAll={selectAllPlots}
+                label="Plots"
+              />
+            </div>
 
-            <TasksDropdown
-              tasks={tasks as any}
-              value={ui.selectedTasks}
-              onChange={ui.setSelectedTasks}
-            />
+            {/* Crops */}
+            <div className="inline-flex items-center gap-2">
+              <Sprout className="size-4 text-[#02A78B]" />
+              <CropsDropdown
+                crops={crops}
+                methods={methods}
+                value={{ crops: ui.selectedCrops, method: ui.method }}
+                onChange={(next) => {
+                  ui.setSelectedCrops(next.crops ?? []);
+                  ui.setMethod(next.method ?? null);
+                  ui.setHideAllCrops(false);
+                  if (next.crops && next.crops.length === 1) ui.setCrop(next.crops[0]);
+                }}
+                onClearAll={clearCrops}
+                onSelectAll={selectAllCrops}
+                label="Crops"
+              />
+            </div>
+
+            {/* Tasks */}
+            <div className="inline-flex items-center gap-2">
+              <ClipboardList className="size-4 text-[#02A78B]" />
+              <TasksDropdown
+                tasks={tasks}
+                value={ui.selectedTasks}
+                onChange={(next) => { ui.setSelectedTasks(next); ui.setHideAllTasks(false); }}
+                onClearAll={clearTasks}
+                onSelectAll={selectAllTasks}
+                label="Tasks"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Indicators */}
+        {/* Right: Indicators */}
         <div className="flex flex-col gap-1">
           <span className="text-sm leading-none text-muted-foreground">Show:</span>
           <div className="flex flex-wrap items-center gap-2">
+            {/* ✅ Weather toggle (render this ONCE) */}
             <IndicatorToggle
               icon={CloudSun}
               label="Weather"
@@ -121,5 +156,5 @@ export default function ProductionFilters() {
       {/* divider */}
       <div className="mt-3 h-px w-full bg-[#E0F0ED]" />
     </section>
-  )
+  );
 }
