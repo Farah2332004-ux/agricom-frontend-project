@@ -1,179 +1,200 @@
 "use client"
 
 import * as React from "react"
-import { AlertTriangle, X } from "lucide-react"
-import { useProductionUI } from "../../production/ui"
-import { visibleWeeks } from "../common/weeks"
+import { X, AlertTriangle } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-// --- styling helpers (same tone as app) ---
-const CARD = "rounded-xl border bg-white shadow-sm"
-const ROW  = "flex items-center gap-4"
-const LABEL = "w-[160px] shrink-0 text-[15px] font-medium text-[#02A78B]"
-const BAR_WRAP = "relative h-4 w-full rounded-full overflow-hidden"
-const TICKS = "absolute inset-0 pointer-events-none"
-const NOTE = "text-xs text-muted-foreground"
+/** Keep these aligned with your grid/WeekScroller math */
+const LEFT_OFFSET = "calc(2.25rem + 0.375rem - 0.5rem)"
+const RIGHT_OFFSET = "calc(2.25rem + 0.375rem)"
 
-// --- trivial PRNG for deterministic demo values (by location + week) ---
+/* ---------------- Helpers ---------------- */
 function rng(seed: string) {
   let h = 2166136261
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
   return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507)), (h >>> 0) / 2 ** 32)
 }
+function series(n: number, seed: string, min = 0, max = 100) {
+  const r = rng(seed)
+  return Array.from({ length: n }, () => Math.round(min + r() * (max - min)))
+}
 
-// derive a (city, country) from first selected plot; fallback
-function deriveLocation(selectedPlots: string[]) {
-  // You can expand this map to your real plot metadata
-  const map: Record<string, { city: string; country: string }> = {
-    "P1.1": { city: "Rome", country: "Italy" },
-    "P1.2": { city: "Rome", country: "Italy" },
-    "P2.1": { city: "Milan", country: "Italy" },
-    "P3.1": { city: "Seville", country: "Spain" },
-    "P3.2": { city: "Seville", country: "Spain" },
+/** Smooth multi-stop color scale */
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+function hexToRgb(hex: string) {
+  const h = hex.replace("#", "")
+  return [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(2, 4), 16), Number.parseInt(h.slice(4, 6), 16)]
+}
+function rgbToHex([r, g, b]: number[]) {
+  const h = (n: number) => n.toString(16).padStart(2, "0")
+  return `#${h(Math.round(r))}${h(Math.round(g))}${h(Math.round(b))}`
+}
+function makeScale(stops: string[]) {
+  const rgb = stops.map(hexToRgb)
+  return (t: number) => {
+    const clamped = Math.max(0, Math.min(0.9999, t))
+    const seg = Math.floor(clamped * (stops.length - 1))
+    const localT = clamped * (stops.length - 1) - seg
+    const [r1, g1, b1] = rgb[seg],
+      [r2, g2, b2] = rgb[seg + 1] ?? rgb[seg]
+    return rgbToHex([lerp(r1, r2, localT), lerp(g1, g2, localT), lerp(b1, b2, localT)])
   }
-  const first = selectedPlots[0]
-  if (first && map[first]) return map[first]
-  return { city: "Berlin", country: "Germany" } // fallback demo location
 }
 
-// make a nice temp gradient (blue→green→yellow→orange→red)
-function tempGradientCss() {
-  return {
-    background:
-      "linear-gradient(90deg, #1f9ae0 0%, #37a16b 35%, #f6cf3c 60%, #ffa146 80%, #ef4444 100%)",
-  } as React.CSSProperties
+/** Palettes (more steps for a smoother gradient look) */
+const tempScale = makeScale([
+  "#2EA6D7",
+  "#3CB4C8",
+  "#49C1B9",
+  "#60C98D",
+  "#7BC16C",
+  "#A8C653",
+  "#D9C94A",
+  "#F2AE48",
+  "#F28A47",
+  "#EA4A3C",
+])
+
+const rainScale = makeScale([
+  "#2EA6D7",
+  "#36B0CC",
+  "#3CB98D",
+  "#67BF7A",
+  "#8DC568",
+  "#B9C857",
+  "#E0B94F",
+  "#F2AE48",
+  "#EA6E40",
+])
+
+type Props = {
+  weeks: number[]
+  locationLabel: string
+  onClose: () => void
+  className?: string
 }
 
-// make a precip gradient (blue→green→yellow→orange)
-function rainGradientCss() {
-  return {
-    background:
-      "linear-gradient(90deg, #1f9ae0 0%, #37a16b 60%, #f6cf3c 82%, #ef4444 100%)",
-  } as React.CSSProperties
-}
+export default function WeatherPanel({ weeks, locationLabel, onClose, className = "" }: Props) {
+  const count = weeks?.length ?? 0
+  const temps = React.useMemo(() => series(count, "wx-temps", 10, 95), [count])
+  const rain = React.useMemo(() => series(count, "wx-rain", 10, 95), [count])
 
-// draw week separators over bars
-function WeekTicks({ count }: { count: number }) {
-  return (
-    <div className={TICKS}>
-      {Array.from({ length: count - 1 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute top-0 h-full w-px bg-white/50"
-          style={{ left: `${((i + 1) / count) * 100}%` }}
-        />
-      ))}
-    </div>
-  )
-}
+  if (!count) return null
 
-// little square bracket to indicate a “watch range”
-function Bracket({ startPct, endPct }: { startPct: number; endPct: number }) {
-  const left = Math.min(startPct, endPct)
-  const right = Math.max(startPct, endPct)
-  return (
-    <>
-      <div
-        className="absolute -top-[6px] h-[8px] w-[2px] rounded bg-black/70"
-        style={{ left: `calc(${left}% - 1px)` }}
-      />
-      <div
-        className="absolute -top-[6px] h-[8px] w-[2px] rounded bg-black/70"
-        style={{ left: `calc(${right}% - 1px)` }}
-      />
-      <div
-        className="absolute -top-[2px] h-[2px] rounded bg-black/70"
-        style={{ left: `${left}%`, width: `calc(${right - left}%)` }}
-      />
-    </>
-  )
-}
+  const tempMsg = (v: number) =>
+    v >= 85
+      ? "High Temp Risk – May affect crop flowering"
+      : v >= 70
+        ? "Warm – monitor irrigation and heat stress"
+        : v >= 50
+          ? "Optimal range"
+          : "Cool – growth may slow"
 
-export default function WeatherPanel() {
-  const ui = useProductionUI()
-  const weeks = visibleWeeks(ui.weekStart, ui.window, 1, 52, true)
-  const { city, country } = deriveLocation(ui.selectedPlots)
+  const rainMsg = (v: number) =>
+    v <= 15
+      ? "Insufficient – May cause crop stress"
+      : v <= 30
+        ? "Low precipitation – watch soil moisture"
+        : v <= 70
+          ? "Adequate precipitation"
+          : "Heavy precipitation – watch disease risk"
 
-  // generate demo weekly temp/precip values deterministically per location
-  const seed = `${city}-${country}-${weeks[0]}-${weeks[weeks.length - 1]}`
-  const r = React.useMemo(() => rng(seed), [seed])
-
-  // Temperature (°C) and Precipitation (mm) arrays for visible weeks
-  const temps = weeks.map(() => Math.round(14 + r() * 22))   // 14..36 °C
-  const rains = weeks.map(() => Math.round(r() * 35))        // 0..35 mm
-
-  // simple risk logic
-  const heatRisk = temps.some((t) => t >= 34)
-  const droughtRisk = average(rains) < 8 || rains.slice(-3).every((mm) => mm < 4)
-
-  // markers/brackets
-  const maxTemp = 40
-  const tempBracket = {
-    startPct: (Math.max(...temps) / maxTemp) * 100,
-    endPct: (Math.min(...temps) / maxTemp) * 100,
-  }
-
-  const maxRain = 40
-  const rainBracket = {
-    startPct: (Math.max(...rains) / maxRain) * 100,
-    endPct: (Math.min(...rains) / maxRain) * 100,
+  const barOuterStyle: React.CSSProperties = {
+    marginLeft: LEFT_OFFSET,
+    marginRight: RIGHT_OFFSET,
   }
 
-  const now = new Date()
-  const asOf = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  const renderBarWithWarnings = (values: number[], scale: (t: number) => string, type: "temp" | "rain") => {
+    return (
+      <div className="relative" style={barOuterStyle}>
+        {/* Background gradient bar */}
+        <div className="h-4 rounded-full relative overflow-hidden">
+          <div
+            className="h-full w-full rounded-full"
+            style={{
+              background: `linear-gradient(to right, ${values
+                .map((v, i) => {
+                  const t = v / 100
+                  const position = (i / (values.length - 1)) * 100
+                  return `${scale(t)} ${position}%`
+                })
+                .join(", ")})`,
+            }}
+          />
+        </div>
+
+        {/* Warning indicators */}
+        {values.map((v, i) => {
+          const shouldShowWarning = type === "temp" ? v >= 85 : v <= 15
+          if (!shouldShowWarning) return null
+
+          const position = (i / (values.length - 1)) * 100
+          const message = type === "temp" ? tempMsg(v) : rainMsg(v)
+
+          return (
+            <Tooltip key={`warning-${type}-${i}`}>
+              <TooltipTrigger asChild>
+                <div
+                  className="absolute top-0 transform -translate-x-1/2 -translate-y-1"
+                  style={{ left: `${position}%` }}
+                >
+                  <AlertTriangle className="size-4 text-red-500 bg-white rounded-full p-0.5" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-4 text-red-500" />
+                  <div className="max-w-[240px] text-xs">
+                    <div className="font-medium">Week {weeks[i]}</div>
+                    <div>{message}</div>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const nowStr = "3:43 PM CEST"
 
   return (
-    <section className={`${CARD} mb-4 p-4`}>
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between">
-        <div>
-          <div className="text-[15px] font-semibold text-[#02A78B]">
-            Weekly Weather Forecast <span className="text-black">— {city}, {country}</span>
+    <TooltipProvider delayDuration={120}>
+      <section
+        className={`rounded-2xl border bg-white p-4 shadow-sm ${className}`}
+        aria-label="Weekly Weather Forecast"
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <div className="text-[15px] font-semibold text-[#02A78B]">
+              Weekly Weather Forecast <span className="font-normal text-black">– {locationLabel}</span>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">As of {nowStr}</div>
           </div>
-          <div className={NOTE}>As of {asOf}</div>
+          <button
+            onClick={onClose}
+            aria-label="Close weather panel"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
-        <button
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-[#E0F0ED]/70"
-          onClick={() => ui.toggleIndicator("weather", false)}
-          aria-label="Close weather"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      {/* Temperature */}
-      <div className={`${ROW} mb-4`}>
-        <div className={LABEL}>Temperature</div>
-        <div className={BAR_WRAP} style={tempGradientCss()}>
-          <WeekTicks count={weeks.length} />
-          <Bracket {...tempBracket} />
+        {/* Temperature */}
+        <div className="mb-4 flex items-center gap-4">
+          <div className="text-[15px] font-medium text-[#02A78B] w-32 flex-shrink-0">Temperature</div>
+          <div className="flex-1">{renderBarWithWarnings(temps, tempScale, "temp")}</div>
         </div>
-        {heatRisk && (
-          <div className="ml-3 flex items-center gap-2 text-xs text-[#b42318]">
-            <AlertTriangle className="size-4" />
-            <span>High Temp Risk – may affect crop flowering</span>
-          </div>
-        )}
-      </div>
 
-      {/* Precipitation */}
-      <div className={`${ROW}`}>
-        <div className={LABEL}>Water Precipitation</div>
-        <div className={BAR_WRAP} style={rainGradientCss()}>
-          <WeekTicks count={weeks.length} />
-          <Bracket {...rainBracket} />
+        {/* Water Precipitation */}
+        <div className="flex items-center gap-4">
+          <div className="text-[15px] font-medium text-[#02A78B] w-32 flex-shrink-0">Water Precipitation</div>
+          <div className="flex-1">{renderBarWithWarnings(rain, rainScale, "rain")}</div>
         </div>
-        {droughtRisk && (
-          <div className="ml-3 flex items-center gap-2 text-xs text-[#b42318]">
-            <AlertTriangle className="size-4" />
-            <span>Insufficient – may cause crop stress</span>
-          </div>
-        )}
-      </div>
-    </section>
+      </section>
+    </TooltipProvider>
   )
-}
-
-function average(arr: number[]) {
-  return arr.reduce((a, b) => a + b, 0) / (arr.length || 1)
 }

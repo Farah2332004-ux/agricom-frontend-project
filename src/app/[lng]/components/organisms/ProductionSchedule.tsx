@@ -173,6 +173,17 @@ export default function ProductionSchedule() {
       <p className="mb-3 text-[15px]">
         Showing plantation schedule and expected production for <b>{cropsLabel}</b>, matched with forecasted demand
       </p>
+{ui.indicators.weather && (
+  <WeatherPanel
+    className="mb-8"                 // extra space before the scroller
+    weeks={weeks}
+    locationLabel={ui.locationLabel ?? "Berlin, Germany"}
+    onClose={() => ui.toggleIndicator("weather", false)}
+  />
+)}
+
+
+
 
       <WeekScroller weekStart={ui.weekStart} window={ui.window} onChange={ui.setWeekStart} min={1} max={52} wrap />
 

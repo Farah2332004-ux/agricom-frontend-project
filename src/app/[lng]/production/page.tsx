@@ -11,7 +11,7 @@ export default function ProductionPage() {
   return (
     <>
       <ProductionFilters />
-      {ui.indicators.weather && <WeatherPanel />}   {/* <-- add this */}
+ 
       <ProductionSchedule />
     </>
   )
