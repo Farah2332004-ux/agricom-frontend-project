@@ -56,6 +56,13 @@ export default function ProductionFilters() {
   const clearPlots = () => { ui.setSelectedPlots([]); ui.setHideAllPlots(true); };
   const selectAllPlots = () => { ui.setSelectedPlots(allPlotCodes); ui.setHideAllPlots(false); };
 
+  // (Nice-to-have) Set a friendly location label from the first chosen plot
+  React.useEffect(() => {
+    if (ui.selectedPlots.length === 0) return;
+    const first = plotItems.find(p => p.plot === ui.selectedPlots[0]);
+    if (first) ui.setLocationLabel(`${first.city}, ${first.country}`);
+  }, [ui.selectedPlots]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <section className="mb-3 w-full">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-start">
@@ -118,7 +125,6 @@ export default function ProductionFilters() {
         <div className="flex flex-col gap-1">
           <span className="text-sm leading-none text-muted-foreground">Show:</span>
           <div className="flex flex-wrap items-center gap-2">
-            {/* ✅ Weather toggle (render this ONCE) */}
             <IndicatorToggle
               icon={CloudSun}
               label="Weather"

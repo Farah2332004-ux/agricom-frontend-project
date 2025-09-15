@@ -14,6 +14,11 @@ type Props = {
   label?: string
   totalLabel?: string
   cellMinPx?: number
+
+  // NEW: short-term selection
+  selectedWeek?: number | null
+  onSelectWeek?: (week: number) => void
+  selectableWeeks?: number[] // e.g., [NOW_WEEK, NEXT_WEEK]
 }
 
 export default function WeekScroller({
@@ -27,6 +32,9 @@ export default function WeekScroller({
   label = "Week Number",
   totalLabel = "Total",
   cellMinPx = 34,
+  selectedWeek = null,
+  onSelectWeek,
+  selectableWeeks = [],
 }: Props) {
   const span = max - min + 1
 
@@ -42,6 +50,8 @@ export default function WeekScroller({
 
   const goLeft  = () => onChange(wrap ? (weekStart === min ? max : weekStart - 1) : Math.max(min, weekStart - 1))
   const goRight = () => onChange(wrap ? (weekStart === max ? min : weekStart + 1) : Math.min(max, weekStart + 1))
+
+  const isSelectable = (w: number) => selectableWeeks.includes(w)
 
   return (
     <div className={`mb-3 grid grid-cols-[180px_minmax(0,1fr)_auto] items-center ${className}`}>
@@ -62,14 +72,29 @@ export default function WeekScroller({
           className="grid min-w-0 grow gap-1.5"
           style={{ gridTemplateColumns: `repeat(${window}, minmax(${cellMinPx}px, 1fr))` }}
         >
-          {weeks.map((w) => (
-            <div
-              key={w}
-              className="flex h-8 items-center justify-center rounded-[6px] bg-[#0AA37A] px-2 text-xs font-medium text-white"
-            >
-              {w}
-            </div>
-          ))}
+          {weeks.map((w) => {
+            const selected = selectedWeek === w
+            const allowed  = isSelectable(w)
+            const base = "flex h-8 items-center justify-center rounded-[6px] px-2 text-xs font-medium"
+            const style = selected
+              ? "bg-white border-2 border-[#02A78B] text-[#02A78B]"
+              : allowed
+              ? "bg-[#0AA37A] text-white hover:opacity-90 cursor-pointer"
+              : "bg-[#0AA37A] text-white opacity-60 cursor-default"
+
+            return (
+              <button
+                key={w}
+                type="button"
+                className={`${base} ${style}`}
+                onClick={() => allowed && onSelectWeek?.(w)}
+                aria-pressed={selected}
+                aria-disabled={!allowed}
+              >
+                {w}
+              </button>
+            )
+          })}
         </div>
 
         <button
