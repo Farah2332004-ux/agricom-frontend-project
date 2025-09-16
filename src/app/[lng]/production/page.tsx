@@ -3,6 +3,7 @@
 
 import ProductionFilters from "../components/organisms/ProductionFilters"
 import ProductionSchedule from "../components/organisms/ProductionSchedule"
+import ImpactDialog from "../components/common/ImpactDialog";
 import WeatherPanel from "../components/organisms/WeatherPanel" // <-- add
 import { useProductionUI } from "./ui"
 
@@ -11,7 +12,7 @@ export default function ProductionPage() {
   return (
     <>
       <ProductionFilters />
- 
+ <ImpactDialog />
       <ProductionSchedule />
     </>
   )

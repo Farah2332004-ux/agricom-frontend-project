@@ -1,65 +1,73 @@
+// src/app/[lng]/production/ui.tsx
 "use client";
 
 import { create } from "zustand";
 
 export type IndicatorKey = "weather" | "production" | "demand" | "loss" | "sort";
 
-/* ---------- ISO week helpers (Beirut-aware) ---------- */
-function toTZ(date: Date, tz?: string): Date {
-  return tz ? new Date(new Date(date).toLocaleString("en-US", { timeZone: tz })) : new Date(date);
-}
-function isoWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const diffDays = Math.floor((d.getTime() - yearStart.getTime()) / 86400000) + 1;
-  return Math.ceil(diffDays / 7);
-}
-function weeksInISOYearFor(date: Date): number {
-  const dec28 = new Date(Date.UTC(date.getFullYear(), 11, 28));
-  return isoWeek(dec28) === 53 ? 53 : 52;
-}
-function currentISOWeek(tz: string = "Asia/Beirut"): { week: number; year: number; date: Date } {
-  const now = toTZ(new Date(), tz);
-  return { week: isoWeek(now), year: now.getFullYear(), date: now };
-}
-
-export const { week: NOW_WEEK, date: NOW_DATE } = currentISOWeek("Asia/Beirut");
-export const ISO_MAX_THIS_YEAR = weeksInISOYearFor(NOW_DATE);
-
-/* ---------------- Types ---------------- */
-type ProductionUI = {
-  crop: string;                setCrop(c: string): void;
-  method: string | null;       setMethod(m: string | null): void;
-
-  selectedCrops: string[];     setSelectedCrops(crops: string[]): void;
-  hideAllCrops: boolean;       setHideAllCrops(v: boolean): void;
-
-  selectedPlots: string[];     setSelectedPlots(plots: string[]): void;
-  hideAllPlots: boolean;       setHideAllPlots(v: boolean): void;
-
-  selectedTasks: string[];     setSelectedTasks(t: string[]): void;
-  hideAllTasks: boolean;       setHideAllTasks(v: boolean): void;
-
-  weekStart: number;           setWeekStart(w: number): void;
-  window: number;              setWindow(n: number): void;
-
-  // short-term details
-  selectedWeatherWeek: number | null;
-  setSelectedWeatherWeek: (w: number | null) => void;
-
-  locationLabel: string;       setLocationLabel(s: string): void;
-
-  indicators: Record<IndicatorKey, boolean>;
-  toggleIndicator(k: IndicatorKey, v: boolean): void;
-
-  indicatorOrder: IndicatorKey[];
-  setIndicatorOrder(o: IndicatorKey[]): void;
+export type ImpactDialogConfig = {
+  severity?: "warning" | "error" | "info";
+  title: string;
+  message?: string;
+  bullets?: string[];
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
 };
 
-/* ---------------- Store ---------------- */
+type ProductionUI = {
+  // crop + method
+  crop: string;
+  setCrop: (c: string) => void;
+  method: string | null;
+  setMethod: (m: string | null) => void;
+
+  // multi-crop select + hide all
+  selectedCrops: string[];
+  setSelectedCrops: (crops: string[]) => void;
+  hideAllCrops: boolean;
+  setHideAllCrops: (v: boolean) => void;
+
+  // plots select + hide all
+  selectedPlots: string[]; // e.g. ["P1.1","P1.2"]
+  setSelectedPlots: (plots: string[]) => void;
+  hideAllPlots: boolean;
+  setHideAllPlots: (v: boolean) => void;
+
+  // tasks select + hide all
+  selectedTasks: string[];
+  setSelectedTasks: (t: string[]) => void;
+  hideAllTasks: boolean;
+  setHideAllTasks: (v: boolean) => void;
+
+  // weeks
+  weekStart: number;
+  window: number;
+  setWeekStart: (w: number) => void;
+  setWindow: (n: number) => void;
+
+  // indicators + sorting order
+  indicators: Record<IndicatorKey, boolean>;
+  toggleIndicator: (k: IndicatorKey, v: boolean) => void;
+  indicatorOrder: IndicatorKey[];
+  setIndicatorOrder: (o: IndicatorKey[]) => void;
+
+  // Task panel context (you already use this)
+  taskPanelOpen?: boolean;
+  taskPanelCtx?: any;
+  openTaskPanel?: (ctx: any) => void;
+  closeTaskPanel?: () => void;
+
+  // NEW: global impact dialog
+  impactDialogOpen: boolean;
+  impactConfig: ImpactDialogConfig | null;
+  openImpactDialog: (cfg: ImpactDialogConfig) => void;
+  closeImpactDialog: () => void;
+};
+
 export const useProductionUI = create<ProductionUI>((set, get) => ({
+  // defaults
   crop: "Broccoli",
   setCrop: (crop) => set({ crop }),
 
@@ -85,21 +93,23 @@ export const useProductionUI = create<ProductionUI>((set, get) => ({
   hideAllTasks: false,
   setHideAllTasks: (v) => set({ hideAllTasks: v }),
 
-  weekStart: NOW_WEEK,   // start at current ISO week
+  weekStart: 12,
   window: 16,
   setWeekStart: (w) => set({ weekStart: w }),
   setWindow: (n) => set({ window: n }),
 
-  // short-term details selection (null = none)
-  selectedWeatherWeek: null,
-  setSelectedWeatherWeek: (w) => set({ selectedWeatherWeek: w }),
-
-  locationLabel: "Berlin, Germany",
-  setLocationLabel: (s) => set({ locationLabel: s }),
-
   indicators: { weather: false, production: true, demand: true, loss: true, sort: false },
   toggleIndicator: (k, v) => set({ indicators: { ...get().indicators, [k]: v } }),
-
   indicatorOrder: ["production", "demand", "loss"],
   setIndicatorOrder: (o) => set({ indicatorOrder: o }),
+
+  // optional task panel helpers (if you use them)
+  openTaskPanel: (ctx) => set({ taskPanelOpen: true, taskPanelCtx: ctx }),
+  closeTaskPanel: () => set({ taskPanelOpen: false, taskPanelCtx: null }),
+
+  // NEW: global impact dialog actions
+  impactDialogOpen: false,
+  impactConfig: null,
+  openImpactDialog: (cfg) => set({ impactDialogOpen: true, impactConfig: cfg }),
+  closeImpactDialog: () => set({ impactDialogOpen: false, impactConfig: null }),
 }));

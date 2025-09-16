@@ -2,9 +2,22 @@
 
 import * as React from "react";
 import {
-  CloudSun, ShoppingCart, Trash2, ArrowUpDown,
-  Scissors, Hammer, Droplets, Wheat, Shovel, FlaskConical, Shield, Sprout, MinusCircle,
-  Filter as FilterIcon, ClipboardList, MapPin,
+  CloudSun,
+  ShoppingCart,
+  Trash2,
+  ArrowUpDown,
+  Scissors,
+  Hammer,
+  Droplets,
+  Wheat,
+  Shovel,
+  FlaskConical,
+  Shield,
+  Sprout,
+  MinusCircle,
+  Filter as FilterIcon,
+  ClipboardList,
+  MapPin,
 } from "lucide-react";
 
 import PlotsDropdown, { type PlotNode } from "../molecules/PlotsDropdown";
@@ -16,7 +29,7 @@ import { useProductionUI } from "../../production/ui";
 export default function ProductionFilters() {
   const ui = useProductionUI();
 
-  // Plots
+  /* ------------ Demo data ------------ */
   const plotItems: PlotNode[] = [
     { country: "Italy", city: "Rome",    plot: "P1.1", id: "it-rome-p1-1" },
     { country: "Italy", city: "Rome",    plot: "P1.2", id: "it-rome-p1-2" },
@@ -24,16 +37,21 @@ export default function ProductionFilters() {
     { country: "Spain", city: "Seville", plot: "P3.1", id: "es-sev-p3-1" },
     { country: "Spain", city: "Seville", plot: "P3.2", id: "es-sev-p3-2" },
   ];
-  const allPlotCodes = Array.from(new Set(plotItems.map(p => p.plot))); // ["P1.1","P1.2","P2.1","P3.1","P3.2"]
+  const allPlotCodes = Array.from(new Set(plotItems.map((p) => p.plot)));
 
-  // Crops
   const crops = ["Tomato", "Broccoli", "Potato", "Cabbage", "Onion", "Spinach"];
   const methods = [
-    "Organic","Conventional","Hydroponic","Urban","Aquaponic",
-    "Tunnel","GreenHouse","Open Field","Vertical Farming",
+    "Organic",
+    "Conventional",
+    "Hydroponic",
+    "Urban",
+    "Aquaponic",
+    "Tunnel",
+    "GreenHouse",
+    "Open Field",
+    "Vertical Farming",
   ];
 
-  // Tasks
   const tasks: TaskItem[] = [
     { label: "Pruning",          value: "pruning",        icon: Scissors },
     { label: "Staking",          value: "staking",        icon: Hammer },
@@ -46,22 +64,37 @@ export default function ProductionFilters() {
     { label: "Protection",       value: "protection",     icon: Shield },
   ];
 
-  // Clear/Select-All handlers
-  const clearTasks = () => { ui.setSelectedTasks([]); ui.setHideAllTasks(true); };
-  const selectAllTasks = () => { ui.setSelectedTasks(tasks.map(t => t.value)); ui.setHideAllTasks(false); };
+  /* ------------ Handlers ------------ */
+  const clearTasks = () => {
+    ui.setSelectedTasks([]);
+    ui.setHideAllTasks(true);
+    ui.closeTaskPanel?.(); // if present in store
+  };
+  const selectAllTasks = () => {
+    const all = tasks.map((t) => t.value);
+    ui.setSelectedTasks(all as any);
+    ui.setHideAllTasks(false);
+    ui.openTaskPanel?.({ tasks: all as any });
+  };
 
-  const clearCrops = () => { ui.setSelectedCrops([]); ui.setMethod(null); ui.setHideAllCrops(true); };
-  const selectAllCrops = () => { ui.setSelectedCrops(crops); ui.setHideAllCrops(false); };
+  const clearCrops = () => {
+    ui.setSelectedCrops([]);
+    ui.setMethod(null);
+    ui.setHideAllCrops(true);
+  };
+  const selectAllCrops = () => {
+    ui.setSelectedCrops(crops);
+    ui.setHideAllCrops(false);
+  };
 
-  const clearPlots = () => { ui.setSelectedPlots([]); ui.setHideAllPlots(true); };
-  const selectAllPlots = () => { ui.setSelectedPlots(allPlotCodes); ui.setHideAllPlots(false); };
-
-  // (Nice-to-have) Set a friendly location label from the first chosen plot
-  React.useEffect(() => {
-    if (ui.selectedPlots.length === 0) return;
-    const first = plotItems.find(p => p.plot === ui.selectedPlots[0]);
-    if (first) ui.setLocationLabel(`${first.city}, ${first.country}`);
-  }, [ui.selectedPlots]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clearPlots = () => {
+    ui.setSelectedPlots([]);
+    ui.setHideAllPlots(true);
+  };
+  const selectAllPlots = () => {
+    ui.setSelectedPlots(allPlotCodes);
+    ui.setHideAllPlots(false);
+  };
 
   return (
     <section className="mb-3 w-full">
@@ -80,7 +113,10 @@ export default function ProductionFilters() {
               <PlotsDropdown
                 items={plotItems}
                 value={ui.selectedPlots}
-                onChange={(next) => { ui.setSelectedPlots(next); ui.setHideAllPlots(false); }}
+                onChange={(next) => {
+                  ui.setSelectedPlots(next);
+                  ui.setHideAllPlots(false);
+                }}
                 onClearAll={clearPlots}
                 onSelectAll={selectAllPlots}
                 label="Plots"
@@ -111,8 +147,16 @@ export default function ProductionFilters() {
               <ClipboardList className="size-4 text-[#02A78B]" />
               <TasksDropdown
                 tasks={tasks}
-                value={ui.selectedTasks}
-                onChange={(next) => { ui.setSelectedTasks(next); ui.setHideAllTasks(false); }}
+                value={ui.selectedTasks as any}
+                onChange={(next) => {
+                  ui.setSelectedTasks(next as any);
+                  ui.setHideAllTasks(false);
+                  if (next && next.length) {
+                    ui.openTaskPanel?.({ tasks: next as any });
+                  } else {
+                    ui.closeTaskPanel?.();
+                  }
+                }}
                 onClearAll={clearTasks}
                 onSelectAll={selectAllTasks}
                 label="Tasks"
