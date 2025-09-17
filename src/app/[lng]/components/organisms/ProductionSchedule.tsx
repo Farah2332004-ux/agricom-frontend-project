@@ -27,6 +27,7 @@ import {
 import WeatherPanel from "./WeatherPanel";
 import ShortTermWeatherPanel from "./ShortTermWeatherPanel";
 import TaskDetailsPanel from "./TaskDetailsPanel";
+import HarvestSimulator from "./HarvestSimulator"; // NEW
 
 /* ---------------- Column system (match WeekScroller) ---------------- */
 const LABEL_PX = 180;
@@ -77,7 +78,7 @@ const taskIcon: Record<TaskKey, React.ComponentType<{ className?: string }>> = {
   "soil-prep": Shovel,
   fertilization: FlaskConical,
   protection: Shield,
-  thinning: SunMedium, // placeholder icon
+  thinning: SunMedium,
 };
 
 function stageColor(s: Stage) {
@@ -104,7 +105,6 @@ function rng(seed: string) {
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
   return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507)), (h >>> 0) / 2 ** 32);
 }
-
 function cellFor(groupId: string, week: number) {
   const r = rng(`${groupId}-${week}`);
   const roll = r();
@@ -140,22 +140,12 @@ function buildGroupsForCrop(plots: string[], cropName: string) {
   );
 }
 
-/* ---------------- Week helpers (for short-term) ---------------- */
-function weekOfYear(d = new Date()) {
-  // ISO week number
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
-
 /* ---------------- Component ---------------- */
 export default function ProductionSchedule() {
   const ui = useProductionUI();
   const weeks = visibleWeeks(ui.weekStart, ui.window, 1, 52, true);
 
-  // Short-term weather selection
+  // short-term weather
   const [shortWeek, setShortWeek] = React.useState<number | null>(null);
   const [shortData, setShortData] = React.useState({
     tempC: 22,
@@ -164,26 +154,31 @@ export default function ProductionSchedule() {
     windKmh: 7,
   });
 
-  const currentWeek = weekOfYear();
+  const currentWeek = (function weekOfYear(d = new Date()) {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  })();
   const nextWeek = ((currentWeek % 52) + 1);
 
   const handlePickShortTerm = (week: number, payload?: Partial<typeof shortData>) => {
-    // only allow current or next week
     if (week !== currentWeek && week !== nextWeek) return;
     setShortWeek(week);
     if (payload) setShortData((s) => ({ ...s, ...payload }));
   };
 
-  // Crops to render (respect “clear crops”)
+  // Crops to render
   const cropsToRender = ui.hideAllCrops ? [] : ui.selectedCrops.length > 0 ? ui.selectedCrops : [ui.crop];
 
-  // All visible groups (respect “clear plots”)
+  // Visible groups
   const allGroups = React.useMemo(() => {
     if (ui.hideAllPlots) return [];
     return cropsToRender.flatMap((c) => buildGroupsForCrop(ui.selectedPlots, c));
   }, [cropsToRender, ui.selectedPlots, ui.hideAllPlots]);
 
-  // Totals for sort
+  // totals for sort
   const totalsByType = {
     production: allGroups.reduce((s, g) => s + sum(weeks.map((w) => cellFor(g.id, w).prod)), 0),
     demand: sum(weeks.map(demandForWeek)),
@@ -194,14 +189,15 @@ export default function ProductionSchedule() {
       ? (["production", "demand", "loss"] as const).sort((a, b) => totalsByType[b] - totalsByType[a])
       : ["production", "demand", "loss"];
 
-  // Expand/collapse per crop
+  // expand/collapse per crop
   const [openMap, setOpenMap] = React.useState<Record<string, boolean>>({});
   const toggleCrop = (c: string) => setOpenMap((m) => ({ ...m, [c]: !(m[c] ?? true) }));
 
   const cropsLabel = cropsToRender.length ? cropsToRender.join(", ") : "—";
   const locationLabel = (ui as any).locationLabel || "Berlin, Germany";
 
-  /* ---- Click handler for production cell -> open task details ---- */
+  /* ---- Click handlers --------------------------------------------------- */
+  // A. Open Task Details (single click, unchanged)
   const handleCellClick = (visibleTasks: TaskKey[], w: number, gId: string, cropName: string) => {
     if (!visibleTasks.length) return;
     ui.openTaskPanel?.({
@@ -212,10 +208,21 @@ export default function ProductionSchedule() {
     });
   };
 
+  // B. Open Simulator (NEW: double-click the cell – clearer than shift-click)
+  const openSimulator = (week: number, gId: string, cropName: string) => {
+    ui.openSimulator({
+      week,
+      groupId: gId,
+      crop: cropName,
+      plots: ui.hideAllPlots ? [] : ui.selectedPlots.length ? ui.selectedPlots : ["P1.1", "P1.2", "P2.1"],
+    });
+  };
+
   return (
     <section className="mt-6">
-      {/* Overlay panels */}
+      {/* Overlays */}
       {ui.taskPanelOpen && <TaskDetailsPanel onClose={ui.closeTaskPanel} />}
+      {ui.simulatorOpen && <HarvestSimulator />}
 
       {ui.indicators.weather && (
         <div className="mb-6">
@@ -224,8 +231,7 @@ export default function ProductionSchedule() {
             weeks={weeks}
             locationLabel={locationLabel}
             onClose={() => ui.toggleIndicator("weather", false)}
-            // NB: WeatherPanel can call us with (week, payload) — payload optional for older versions
-            onPickShortTermWeek={(week: number, data?: any) => handlePickShortTerm(week, data)}
+            onPickShortTermWeek={(w: number, data?: any) => handlePickShortTerm(w, data)}
           />
 
           {shortWeek && (shortWeek === currentWeek || shortWeek === nextWeek) && (
@@ -246,14 +252,21 @@ export default function ProductionSchedule() {
         Showing plantation schedule and expected production for <b>{cropsLabel}</b>, matched with forecasted demand
       </p>
 
-      <WeekScroller weekStart={ui.weekStart} window={ui.window} onChange={ui.setWeekStart} min={1} max={52} wrap />
+      <WeekScroller
+        weekStart={ui.weekStart}
+        window={ui.window}
+        onChange={ui.setWeekStart}
+        min={1}
+        max={52}
+        wrap
+      />
 
       <TooltipProvider delayDuration={150}>
         {cropsToRender.map((cropName) => {
           const groups = ui.hideAllPlots ? [] : buildGroupsForCrop(ui.selectedPlots, cropName);
           const open = openMap[cropName] ?? true;
 
-          // Header weekly totals across this crop’s groups
+          // Header totals
           const headerWeekTotals = weeks.map((w) => sum(groups.map((g) => cellFor(g.id, w).prod)));
           const cropHeaderTotal = sum(headerWeekTotals);
 
@@ -293,7 +306,7 @@ export default function ProductionSchedule() {
                 </div>
               </div>
 
-              {/* Collapsible content by selected type order */}
+              {/* Sections */}
               {open &&
                 typeOrder.map((type) => {
                   if (type === "production" && ui.indicators.production) {
@@ -330,8 +343,17 @@ export default function ProductionSchedule() {
                                   const Cell = (
                                     <div
                                       className="flex h-8 cursor-pointer items-center justify-center rounded-[6px] border"
+                                      title="Double-click to open Harvest Simulator"
                                       style={{ background: stageColor(c.stage), color: onDark ? "white" : "inherit" }}
-                                      onClick={() => handleCellClick(visibleTasks, w, g.id, cropName)}
+                                      onClick={() => handleCellClick(visibleTasks, w, g.id, cropName)}          // single-click -> details (unchanged)
+                                   onDoubleClick={() =>
+    ui.openSimulator?.({
+      week: w,
+      groupId: g.id,
+      crop: cropName,
+      plots: ui.selectedPlots,
+    })
+  }                   // NEW: double-click -> simulator
                                     >
                                       {visibleTasks.slice(0, 3).map((tk, i) => {
                                         const TIcon = taskIcon[tk];

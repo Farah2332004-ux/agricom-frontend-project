@@ -1,57 +1,56 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import * as React from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type Props = {
-  weekStart: number
-  window: number
-  onChange: (nextStart: number) => void
-  min?: number
-  max?: number
-  wrap?: boolean
-  className?: string
-  label?: string
-  totalLabel?: string
-  cellMinPx?: number
+  weekStart: number;
+  window: number;
+  onChange: (nextStart: number) => void;
+  min?: number;
+  max?: number;
+  wrap?: boolean;
+  className?: string;
+  label?: string;
+  totalLabel?: string;
+  cellMinPx?: number;
 
-  // NEW: short-term selection
-  selectedWeek?: number | null
-  onSelectWeek?: (week: number) => void
-  selectableWeeks?: number[] // e.g., [NOW_WEEK, NEXT_WEEK]
-}
+  /** NEW: when a week pill is clicked */
+  onPickWeek?: (week: number) => void;
+  /** NEW: highlight a selected week (e.g., when Short-Term panel is open) */
+  selectedWeek?: number | null;
+};
 
 export default function WeekScroller({
   weekStart,
   window,
   onChange,
   min = 1,
-  max = 52,
+  max = 53,
   wrap = true,
   className = "",
   label = "Week Number",
   totalLabel = "Total",
   cellMinPx = 34,
+  onPickWeek,
   selectedWeek = null,
-  onSelectWeek,
-  selectableWeeks = [],
 }: Props) {
-  const span = max - min + 1
+  const span = max - min + 1;
 
   const weeks = React.useMemo(
     () =>
       Array.from({ length: window }, (_, i) => {
-        const raw = weekStart + i
-        if (!wrap) return Math.max(min, Math.min(max, raw))
-        return ((raw - min) % span + span) % span + min
+        const raw = weekStart + i;
+        if (!wrap) return Math.max(min, Math.min(max, raw));
+        return ((raw - min) % span + span) % span + min;
       }),
     [weekStart, window, min, max, wrap, span]
-  )
+  );
 
-  const goLeft  = () => onChange(wrap ? (weekStart === min ? max : weekStart - 1) : Math.max(min, weekStart - 1))
-  const goRight = () => onChange(wrap ? (weekStart === max ? min : weekStart + 1) : Math.min(max, weekStart + 1))
-
-  const isSelectable = (w: number) => selectableWeeks.includes(w)
+  const goLeft = () =>
+    onChange(wrap ? (weekStart === min ? max : weekStart - 1) : Math.max(min, weekStart - 1));
+  const goRight = () =>
+    onChange(wrap ? (weekStart === max ? min : weekStart + 1) : Math.min(max, weekStart + 1));
 
   return (
     <div className={`mb-3 grid grid-cols-[180px_minmax(0,1fr)_auto] items-center ${className}`}>
@@ -73,27 +72,21 @@ export default function WeekScroller({
           style={{ gridTemplateColumns: `repeat(${window}, minmax(${cellMinPx}px, 1fr))` }}
         >
           {weeks.map((w) => {
-            const selected = selectedWeek === w
-            const allowed  = isSelectable(w)
-            const base = "flex h-8 items-center justify-center rounded-[6px] px-2 text-xs font-medium"
-            const style = selected
-              ? "bg-white border-2 border-[#02A78B] text-[#02A78B]"
-              : allowed
-              ? "bg-[#0AA37A] text-white hover:opacity-90 cursor-pointer"
-              : "bg-[#0AA37A] text-white opacity-60 cursor-default"
-
+            const isSelected = selectedWeek === w;
             return (
               <button
                 key={w}
                 type="button"
-                className={`${base} ${style}`}
-                onClick={() => allowed && onSelectWeek?.(w)}
-                aria-pressed={selected}
-                aria-disabled={!allowed}
+                className={`flex h-8 items-center justify-center rounded-[6px] px-2 text-xs font-medium
+                            transition-colors
+                            ${isSelected ? "bg-[#0AA37A] text-white ring-2 ring-[#02A78B]" : "bg-[#0AA37A] text-white hover:brightness-95"}`}
+                onClick={() => onPickWeek?.(w)}
+                aria-pressed={isSelected}
+                aria-label={`Week ${w}`}
               >
                 {w}
               </button>
-            )
+            );
           })}
         </div>
 
@@ -107,10 +100,12 @@ export default function WeekScroller({
       </div>
 
       {/* Right: Total chip */}
-      <div className="ml-2 inline-flex h-8 min-w-[80px] items-center justify-center rounded-[6px]
-                      border border-[#02A78B] bg-white px-3 text-sm font-semibold text-[#02A78B]">
+      <div
+        className="ml-2 inline-flex h-8 min-w-[80px] items-center justify-center rounded-[6px]
+                    border border-[#02A78B] bg-white px-3 text-sm font-semibold text-[#02A78B]"
+      >
         {totalLabel}
       </div>
     </div>
-  )
+  );
 }
