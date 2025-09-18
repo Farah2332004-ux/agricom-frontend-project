@@ -24,7 +24,6 @@ function rng(seed: string) {
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
   return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507)), (h >>> 0) / 2 ** 32);
 }
-
 type Stage = "seedling" | "growing" | "ripening" | "harvest";
 function cellFor(groupId: string, week: number) {
   const r = rng(`${groupId}-${week}`);
@@ -35,18 +34,14 @@ function cellFor(groupId: string, week: number) {
   const prod = Math.round(base + r() * 3);
   return { stage, prod };
 }
-
-// keep same helpers used in schedule so numbers feel connected
 const demandForWeek = (w: number) => 20 + ((w * 7) % 8);
 const lossForWeek = (w: number) => Math.max(0, ((w * 3) % 5) - 1);
 
 function mondayOfISOWeek(week: number, year: number) {
-  const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
-  const dow = simple.getUTCDay();
-  const ISOwkStart = simple;
-  const diff = (dow <= 1 ? 7 : 0) + (1 - dow);
-  ISOwkStart.setUTCDate(simple.getUTCDate() + diff);
-  return ISOwkStart;
+  const d = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + (1 - day));
+  return d;
 }
 function endOfISOWeek(week: number, year: number) {
   const s = mondayOfISOWeek(week, year);
@@ -102,58 +97,26 @@ function ecoColor(wasteShare: number, protectionOn: boolean) {
 }
 
 /* quick actions */
-type Scenario = {
-  harvestShift: -1 | 0 | 1;
-  irrigationDelta: number; // -0.2..+0.2
-  protectionOn: boolean;
-};
+type Scenario = { harvestShift: -1 | 0 | 1; irrigationDelta: number; protectionOn: boolean };
 function applyScenario(baseYield: number, baseWaste: number, sc: Scenario) {
   let y = baseYield;
   let w = baseWaste;
-
   y = y * (1 + sc.irrigationDelta);
   if (sc.irrigationDelta < 0) w = w * (1 + Math.abs(sc.irrigationDelta) * 0.6);
   if (sc.protectionOn) w = w * 0.75;
-
   return { yieldAdj: Math.max(0, y), wasteAdj: Math.max(0, w) };
 }
 
-/* metric bar — segments are flex items, labels centered */
-function MetricBar({
-  yieldVal,
-  surplusVal,
-  wasteVal,
-}: {
-  yieldVal: number;
-  surplusVal: number;
-  wasteVal: number;
-}) {
-  const Seg: React.FC<{ color: string; value: number; label?: string; align?: "center" | "left" | "right" }> = ({
-    color,
-    value,
-    label,
-    align = "center",
-  }) => {
+/* metric bar */
+function MetricBar({ yieldVal, surplusVal, wasteVal }: { yieldVal: number; surplusVal: number; wasteVal: number }) {
+  const Seg: React.FC<{ color: string; value: number; label?: string }> = ({ color, value, label }) => {
     if (value <= 0) return null;
     return (
-      <div
-        className="relative flex items-center justify-center"
-        style={{
-          background: color,
-          flex: value, // proportional
-          minWidth: 10, // ensure visibility for tiny segments
-        }}
-      >
+      <div className="relative flex items-center justify-center" style={{ background: color, flex: value, minWidth: 10 }}>
         {label ? (
           <span
-            className="pointer-events-none select-none text-white text-sm font-semibold"
-            style={{
-              position: "absolute",
-              left: align === "left" ? 8 : "50%",
-              right: align === "right" ? 8 : undefined,
-              transform: align === "center" ? "translateX(-50%)" : undefined,
-              whiteSpace: "nowrap",
-            }}
+            className="pointer-events-none select-none text-sm font-semibold text-white"
+            style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }}
           >
             {label}
           </span>
@@ -189,11 +152,8 @@ function Indicator({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex w-24 select-none flex-col items-center">
-          <span
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full"
-            style={{ background: bg, border: `2px solid ${ring}` }}
-          >
+        <div className="flex w-24 select-none flex-col items-center" title={tip}>
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full" style={{ background: bg, border: `2px solid ${ring}` }}>
             <Icon className="h-5 w-5" style={{ color: ring }} />
           </span>
           <span className="mt-1 text-xs text-gray-700">{label}</span>
@@ -202,7 +162,7 @@ function Indicator({
       <TooltipContent
         side="top"
         sideOffset={8}
-        className="z-[70] max-w-sm rounded-lg border bg-white/95 px-3 py-2 text-[12px] leading-5 shadow-lg backdrop-blur-sm"
+        className="z-[70] max-w-sm rounded-lg border bg-white/95 px-3 py-2 text-[12px] leading-5 text-gray-800 shadow-lg backdrop-blur-sm"
         style={{ borderColor: BORDER }}
       >
         {tip}
@@ -227,23 +187,18 @@ function WeekRow({
 }) {
   const { stage, prod } = cellFor(ctx.groupId, week);
 
-  // --- Demand variability to guarantee *some* surplus and *some* tight weeks ---
-  // We vary demand around the (adjusted) yield using a seeded factor [0.7 .. 1.3]
+  // demand variation -> some weeks surplus, some tight
   const marketRng = rng(`market-${ctx.groupId}-${week}`)();
   const demandFactor = 0.7 + marketRng * 0.6; // 0.7..1.3
-  const demandTotal = Math.max(1, Math.round(prod * demandFactor + (week % 3))); // small offset
+  const demandTotal = Math.max(1, Math.round(prod * demandFactor + (week % 3)));
   const demandPerGroup = Math.max(1, Math.round(demandTotal / Math.max(1, groupsCount)));
 
-  // waste baseline tied to schedule’s loss model (so it’s sometimes non-zero)
   const baseWaste = Math.max(0, lossForWeek(week));
-
-  // Apply quick actions (irrigation/protection)
   const { yieldAdj, wasteAdj } = applyScenario(prod, baseWaste, scenario);
   const yieldVal = Math.round(yieldAdj);
   const wasteVal = Math.round(wasteAdj);
   const surplusVal = Math.max(0, Math.round(yieldVal - demandPerGroup));
 
-  // shares for indicator coloring
   const total = Math.max(1, yieldVal + surplusVal + wasteVal);
   const sShare = surplusVal / total;
   const wShare = wasteVal / total;
@@ -254,11 +209,8 @@ function WeekRow({
 
   return (
     <div
-      className="grid items-center gap-6 py-6"
-      style={{
-        gridTemplateColumns: "150px minmax(540px,1fr) 320px",
-        borderTop: `1px solid ${BORDER}`,
-      }}
+      className="grid items-center gap-6 py-5"
+      style={{ gridTemplateColumns: "150px minmax(540px,1fr) 320px", borderTop: `1px solid ${BORDER}` }}
     >
       <div className="pl-1">
         <div className="text-lg font-semibold text-gray-800">Week {week}</div>
@@ -305,29 +257,33 @@ export default function HarvestSimulator() {
 
   const { week, groupId, crop, plots } = ui.simulatorCtx!;
   const year = new Date().getFullYear();
-
-  const groupsCount = 1; // simulate the clicked stream
+  const groupsCount = 1;
 
   const [harvestShift, setHarvestShift] = React.useState<-1 | 0 | 1>(0);
   const [irrigationDelta, setIrrigationDelta] = React.useState(0);
   const [protectionOn, setProtectionOn] = React.useState(false);
 
-  const scenario: Scenario = { harvestShift, irrigationDelta, protectionOn };
-
   const base = ((week - 1 + (harvestShift as number) + 52) % 52) + 1;
   const fourWeeks = [0, 1, 2, 3].map((off) => ((base - 1 + off) % 52) + 1);
 
   const chips = [crop, String(groupId).toUpperCase(), ...(plots?.length ? [plots.join(", ")] : [])];
-
   const close = () => ui.closeSimulator();
 
   return (
     <TooltipProvider delayDuration={100}>
       <div className="fixed inset-0 z-50">
         <div className="absolute inset-0 bg-black/30" onClick={close} />
-        <div className="absolute inset-x-6 top-8 mx-auto max-w-6xl rounded-2xl bg-white shadow-xl">
-          {/* header */}
-          <div className="flex items-center justify-between px-6 py-4">
+        {/* Panel: narrower + capped height + internal scroll */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="absolute inset-x-4 top-6 mx-auto flex max-h-[88vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+        >
+          {/* header (sticky) */}
+          <div
+            className="flex items-center justify-between border-b px-6 py-3"
+            style={{ borderColor: BORDER }}
+          >
             <div className="text-[18px] font-semibold" style={{ color: BRAND }}>
               Harvest Simulator
             </div>
@@ -340,111 +296,102 @@ export default function HarvestSimulator() {
             </button>
           </div>
 
-          {/* selected filters + legend (legend on the right) */}
-          <div className="flex items-start justify-between gap-6 px-6">
-            <div className="flex-1">
-              <div className="mb-2 text-sm text-gray-600">Selected Filters</div>
-              <div className="flex flex-wrap gap-2">
-                {chips.map((c) => (
-                  <span
-                    key={c}
-                    className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
-                    style={{ borderColor: BORDER, background: "#F7FBFA" }}
-                  >
-                    {c}
-                  </span>
-                ))}
+          {/* scrollable content */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* Selected filters + legend */}
+            <div className="flex items-start justify-between gap-6 px-6 pt-4">
+              <div className="flex-1">
+                <div className="mb-2 text-sm text-gray-600">Selected Filters</div>
+                <div className="flex flex-wrap gap-2">
+                  {chips.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
+                      style={{ borderColor: BORDER, background: "#F7FBFA" }}
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 shrink-0 flex items-center gap-6 text-xs text-gray-700 pr-1">
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2 w-3 rounded-sm" style={{ background: YIELD }} />
+                  Expected Yield
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2 w-3 rounded-sm" style={{ background: SURPLUS }} />
+                  Expected Surplus
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2 w-3 rounded-sm" style={{ background: WASTE }} />
+                  Expected Waste
+                </span>
               </div>
             </div>
 
-            <div className="mt-6 shrink-0 flex items-center gap-6 text-xs text-gray-700">
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-2 w-3 rounded-sm" style={{ background: YIELD }} />
-                Expected Yield
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-2 w-3 rounded-sm" style={{ background: SURPLUS }} />
-                Expected Surplus
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-2 w-3 rounded-sm" style={{ background: WASTE }} />
-                Expected Waste
-              </span>
+            {/* quick actions */}
+            <div
+              className="mt-4 flex flex-wrap items-center justify-center gap-4 border-t px-6 py-3 text-sm"
+              style={{ borderColor: BORDER }}
+            >
+              <div className="inline-flex items-center gap-2">
+                <span className="text-gray-600">↔ Harvest shift</span>
+                <button className={`h-8 rounded-md border px-3 ${harvestShift === -1 ? "bg-[#F1F5F4]" : ""}`} style={{ borderColor: BORDER }} onClick={() => setHarvestShift(-1)}>
+                  −1w
+                </button>
+                <button className={`h-8 rounded-md border px-3 ${harvestShift === 0 ? "bg-[#F1F5F4]" : ""}`} style={{ borderColor: BORDER }} onClick={() => setHarvestShift(0)}>
+                  0
+                </button>
+                <button className={`h-8 rounded-md border px-3 ${harvestShift === 1 ? "bg-[#F1F5F4]" : ""}`} style={{ borderColor: BORDER }} onClick={() => setHarvestShift(1)}>
+                  +1w
+                </button>
+              </div>
+
+              <div className="inline-flex items-center gap-3">
+                <span className="text-gray-600">💧 Irrigation Δ</span>
+                <input
+                  type="range"
+                  min={-20}
+                  max={20}
+                  step={1}
+                  value={Math.round(irrigationDelta * 100)}
+                  onChange={(e) => setIrrigationDelta(clamp(parseInt(e.target.value, 10) / 100, -0.2, 0.2))}
+                />
+                <span className="w-10 text-right">{Math.round(irrigationDelta * 100)}%</span>
+              </div>
+
+              <div className="inline-flex items-center gap-2">
+                <span className="text-gray-600">🛡 Protection</span>
+                <button
+                  className={`h-8 rounded-md border px-3 ${protectionOn ? "bg-[#E6FAF5] text-[#0F766E]" : ""}`}
+                  style={{ borderColor: BORDER }}
+                  onClick={() => setProtectionOn((v) => !v)}
+                >
+                  {protectionOn ? "On" : "Off"}
+                </button>
+              </div>
+            </div>
+
+            {/* rows */}
+            <div className="px-6 pb-2">
+              {fourWeeks.map((w) => (
+                <WeekRow
+                  key={`${groupId}-${w}`}
+                  week={w}
+                  year={year}
+                  ctx={{ groupId, crop }}
+                  groupsCount={groupsCount}
+                  scenario={{ harvestShift, irrigationDelta, protectionOn }}
+                />
+              ))}
             </div>
           </div>
 
-          {/* quick actions — CENTERED */}
+          {/* footer (sticky) */}
           <div
-            className="mt-4 flex flex-wrap items-center justify-center gap-4 border-t px-6 py-3 text-sm"
-            style={{ borderColor: BORDER }}
-          >
-            <div className="inline-flex items-center gap-2">
-              <span className="text-gray-600">↔ Harvest shift</span>
-              <button
-                className={`h-8 rounded-md border px-3 ${harvestShift === -1 ? "bg-[#F1F5F4]" : ""}`}
-                style={{ borderColor: BORDER }}
-                onClick={() => setHarvestShift(-1)}
-              >
-                −1w
-              </button>
-              <button
-                className={`h-8 rounded-md border px-3 ${harvestShift === 0 ? "bg-[#F1F5F4]" : ""}`}
-                style={{ borderColor: BORDER }}
-                onClick={() => setHarvestShift(0)}
-              >
-                0
-              </button>
-              <button
-                className={`h-8 rounded-md border px-3 ${harvestShift === 1 ? "bg-[#F1F5F4]" : ""}`}
-                style={{ borderColor: BORDER }}
-                onClick={() => setHarvestShift(1)}
-              >
-                +1w
-              </button>
-            </div>
-
-            <div className="inline-flex items-center gap-3">
-              <span className="text-gray-600">💧 Irrigation Δ</span>
-              <input
-                type="range"
-                min={-20}
-                max={20}
-                step={1}
-                value={Math.round(irrigationDelta * 100)}
-                onChange={(e) => setIrrigationDelta(clamp(parseInt(e.target.value, 10) / 100, -0.2, 0.2))}
-              />
-              <span className="w-10 text-right">{Math.round(irrigationDelta * 100)}%</span>
-            </div>
-
-            <div className="inline-flex items-center gap-2">
-              <span className="text-gray-600">🛡 Protection</span>
-              <button
-                className={`h-8 rounded-md border px-3 ${protectionOn ? "bg-[#E6FAF5] text-[#0F766E]" : ""}`}
-                style={{ borderColor: BORDER }}
-                onClick={() => setProtectionOn((v) => !v)}
-              >
-                {protectionOn ? "On" : "Off"}
-              </button>
-            </div>
-          </div>
-
-          {/* rows */}
-          <div className="px-6 pb-2">
-            {fourWeeks.map((w) => (
-              <WeekRow
-                key={`${groupId}-${w}`}
-                week={w}
-                year={year}
-                ctx={{ groupId, crop }}
-                groupsCount={groupsCount}
-                scenario={{ harvestShift, irrigationDelta, protectionOn }}
-              />
-            ))}
-          </div>
-
-          {/* footer with a single Close CTA */}
-          <div
-            className="flex items-center justify-end gap-3 border-t px-6 py-4"
+            className="flex items-center justify-end gap-3 border-t px-6 py-3"
             style={{ borderColor: BORDER }}
           >
             <button

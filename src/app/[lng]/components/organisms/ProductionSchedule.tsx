@@ -27,7 +27,7 @@ import {
 import WeatherPanel from "./WeatherPanel";
 import ShortTermWeatherPanel from "./ShortTermWeatherPanel";
 import TaskDetailsPanel from "./TaskDetailsPanel";
-import HarvestSimulator from "./HarvestSimulator"; // NEW
+import HarvestSimulator from "./HarvestSimulator";
 
 /* ---------------- Column system (match WeekScroller) ---------------- */
 const LABEL_PX = 180;
@@ -145,6 +145,10 @@ export default function ProductionSchedule() {
   const ui = useProductionUI();
   const weeks = visibleWeeks(ui.weekStart, ui.window, 1, 52, true);
 
+  // click vs double-click guard
+  const clickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const CLICK_DELAY = 220;
+
   // short-term weather
   const [shortWeek, setShortWeek] = React.useState<number | null>(null);
   const [shortData, setShortData] = React.useState({
@@ -161,7 +165,7 @@ export default function ProductionSchedule() {
     const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
     return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   })();
-  const nextWeek = ((currentWeek % 52) + 1);
+  const nextWeek = (currentWeek % 52) + 1;
 
   const handlePickShortTerm = (week: number, payload?: Partial<typeof shortData>) => {
     if (week !== currentWeek && week !== nextWeek) return;
@@ -197,25 +201,55 @@ export default function ProductionSchedule() {
   const locationLabel = (ui as any).locationLabel || "Berlin, Germany";
 
   /* ---- Click handlers --------------------------------------------------- */
-  // A. Open Task Details (single click, unchanged)
-  const handleCellClick = (visibleTasks: TaskKey[], w: number, gId: string, cropName: string) => {
-    if (!visibleTasks.length) return;
-    ui.openTaskPanel?.({
-      tasks: visibleTasks as any,
-      week: w,
-      groupId: gId,
-      crop: cropName,
-    });
+  // A. Single-click -> open Task Details (existing behavior)
+  const openTaskDetails = (visibleTasks: TaskKey[], w: number, gId: string, cropName: string) => {
+if (!visibleTasks.length) return;
+
+  // ⛔ When a task filter is active, do NOT open the Task Details panel.
+  // We only want to visually show the filtered task icons in the schedule.
+  if ((ui.selectedTasks?.length ?? 0) > 0) return;
+
+  ui.openTaskPanel?.({
+    tasks: visibleTasks as any,
+    week: w,
+    groupId: gId,
+    crop: cropName,
+  });
   };
 
-  // B. Open Simulator (NEW: double-click the cell – clearer than shift-click)
+  // B. Double-click -> open Harvest Simulator (new)
   const openSimulator = (week: number, gId: string, cropName: string) => {
-    ui.openSimulator({
+    ui.openSimulator?.({
       week,
       groupId: gId,
       crop: cropName,
       plots: ui.hideAllPlots ? [] : ui.selectedPlots.length ? ui.selectedPlots : ["P1.1", "P1.2", "P2.1"],
     });
+  };
+
+  // unified handler using e.detail so tooltips/icons don’t swallow dblclicks
+  const handleMouseDown = (
+    e: React.MouseEvent,
+    visibleTasks: TaskKey[],
+    w: number,
+    gId: string,
+    cropName: string
+  ) => {
+    // if this is the 2nd click of a double-click
+    if (e.detail === 2) {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
+      openSimulator(w, gId, cropName);
+      return;
+    }
+    // schedule single-click action
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      openTaskDetails(visibleTasks, w, gId, cropName);
+      clickTimerRef.current = null;
+    }, CLICK_DELAY);
   };
 
   return (
@@ -339,28 +373,46 @@ export default function ProductionSchedule() {
                                       );
 
                                   const { label, Icon } = stageMeta(c.stage);
+const Cell = (
+  <div
+    className="flex h-8 cursor-pointer items-center justify-center rounded-[6px] border"
+    title="Double-click to open Harvest Simulator"
+    style={{ background: stageColor(c.stage), color: onDark ? "white" : "inherit" }}
+    onClick={() => {
+      // SINGLE CLICK -> open Task Details (if there are visible tasks)
+      if (!visibleTasks.length) return;
+      if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = window.setTimeout(() => {
+        ui.openTaskPanel?.({
+          tasks: visibleTasks as any,
+          week: w,
+          groupId: g.id,
+          crop: cropName,
+        });
+        clickTimerRef.current = null;
+      }, CLICK_DELAY);
+    }}
+    onDoubleClick={() => {
+      // DOUBLE CLICK -> open Simulator (cancel single-click action)
+      if (clickTimerRef.current) {
+        window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
+      ui.openSimulator?.({
+        week: w,
+        groupId: g.id,
+        crop: cropName,
+        plots: ui.hideAllPlots ? [] : ui.selectedPlots.length ? ui.selectedPlots : ["P1.1", "P1.2", "P2.1"],
+      });
+    }}
+  >
+    {visibleTasks.slice(0, 3).map((tk, i) => {
+      const TIcon = taskIcon[tk];
+      return <TIcon key={`${tk}-${i}`} className="mx-0.5 size-4 opacity-90" />;
+    })}
+  </div>
+);
 
-                                  const Cell = (
-                                    <div
-                                      className="flex h-8 cursor-pointer items-center justify-center rounded-[6px] border"
-                                      title="Double-click to open Harvest Simulator"
-                                      style={{ background: stageColor(c.stage), color: onDark ? "white" : "inherit" }}
-                                      onClick={() => handleCellClick(visibleTasks, w, g.id, cropName)}          // single-click -> details (unchanged)
-                                   onDoubleClick={() =>
-    ui.openSimulator?.({
-      week: w,
-      groupId: g.id,
-      crop: cropName,
-      plots: ui.selectedPlots,
-    })
-  }                   // NEW: double-click -> simulator
-                                    >
-                                      {visibleTasks.slice(0, 3).map((tk, i) => {
-                                        const TIcon = taskIcon[tk];
-                                        return <TIcon key={`${tk}-${i}`} className="mx-0.5 size-4 opacity-90" />;
-                                      })}
-                                    </div>
-                                  );
 
                                   return (
                                     <Tooltip key={`${g.id}-${w}`}>

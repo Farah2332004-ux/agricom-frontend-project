@@ -1,3 +1,4 @@
+// src/app/[lng]/components/organisms/ProductionFilters.tsx
 "use client";
 
 import * as React from "react";
@@ -64,17 +65,16 @@ export default function ProductionFilters() {
     { label: "Protection",       value: "protection",     icon: Shield },
   ];
 
-  /* ------------ Handlers ------------ */
+  /* ------------ Handlers (no panel side-effects) ------------ */
   const clearTasks = () => {
     ui.setSelectedTasks([]);
     ui.setHideAllTasks(true);
-    ui.closeTaskPanel?.(); // if present in store
   };
+
   const selectAllTasks = () => {
     const all = tasks.map((t) => t.value);
     ui.setSelectedTasks(all as any);
     ui.setHideAllTasks(false);
-    ui.openTaskPanel?.({ tasks: all as any });
   };
 
   const clearCrops = () => {
@@ -142,7 +142,7 @@ export default function ProductionFilters() {
               />
             </div>
 
-            {/* Tasks */}
+            {/* Tasks (no drawer open/close here) */}
             <div className="inline-flex items-center gap-2">
               <ClipboardList className="size-4 text-[#02A78B]" />
               <TasksDropdown
@@ -151,11 +151,6 @@ export default function ProductionFilters() {
                 onChange={(next) => {
                   ui.setSelectedTasks(next as any);
                   ui.setHideAllTasks(false);
-                  if (next && next.length) {
-                    ui.openTaskPanel?.({ tasks: next as any });
-                  } else {
-                    ui.closeTaskPanel?.();
-                  }
                 }}
                 onClearAll={clearTasks}
                 onSelectAll={selectAllTasks}

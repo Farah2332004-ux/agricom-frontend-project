@@ -87,8 +87,9 @@ export default function ShortTermWeatherPanel({
 }: Props) {
   const [expanded, setExpanded] = React.useState(false)
 
+  // ⏰ Use Berlin, Germany time
   const nowStr = new Date().toLocaleString(undefined, {
-    timeZone: "Asia/Beirut",
+    timeZone: "Europe/Berlin",
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",

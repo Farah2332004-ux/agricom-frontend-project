@@ -1,22 +1,22 @@
-// src/app/[lng]/components/organisms/Sidebar.tsx
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { usePathname, useParams } from "next/navigation"
-import { ChevronDown } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
-import SidebarItem from "../molecules/SidebarItem"
-import { mainNav, secondaryNav } from "../../menu-items/main"
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname, useParams } from "next/navigation";
+import { ChevronDown } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import SidebarItem from "../molecules/SidebarItem";
+import { mainNav, secondaryNav } from "../../menu-items/main";
 
 function FarmGroup() {
-  const pathname = usePathname()
-  const params = useParams() as { lng?: string }
-  const lng = params?.lng ?? "en"
+  const pathname = usePathname();
+  const params = useParams() as { lng?: string };
+  const lng = params?.lng ?? "en";
 
-  const farm = useMemo(() => mainNav.find((i) => i.href === "/farm")!, [])
-  const farmActive = pathname?.startsWith(`/${lng}${farm.href}`) ?? false
-  const [open, setOpen] = useState(farmActive)
+  const farm = useMemo(() => mainNav.find((i) => i.href === "/farm")!, []);
+  const farmActive = pathname?.startsWith(`/${lng}${farm.href}`) ?? false;
+  const [open, setOpen] = useState(farmActive);
 
   return (
     <div className="space-y-2">
@@ -26,7 +26,6 @@ function FarmGroup() {
         aria-expanded={open}
         variant="ghost"
         className={[
-          // 18px Medium for top-level buttons too
           "w-full justify-start rounded-2xl px-3 py-2 text-[16px] font-medium",
           farmActive
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
@@ -36,7 +35,17 @@ function FarmGroup() {
         <div className="mr-3">
           <farm.icon className="size-5" />
         </div>
-        <span className="flex-1 text-left">Farm</span>
+
+        {/* Make label jump directly to Production */}
+        <Link
+          href={`/${lng}/production`}
+          prefetch={false}
+          className="flex-1 text-left"
+          onClick={(e) => e.stopPropagation()} // don't toggle when label clicked
+        >
+          Farm
+        </Link>
+
         <ChevronDown
           className={[
             "size-4 transition-transform",
@@ -53,12 +62,9 @@ function FarmGroup() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-// ...imports unchanged...
-
-// src/app/[lng]/components/organisms/Sidebar.tsx
 export function SidebarDesktop() {
   return (
     <aside className="fixed left-0 top-16 hidden h-[calc(100dvh-4rem)] w-60 shrink-0 bg-sidebar md:flex">
@@ -75,7 +81,7 @@ export function SidebarDesktop() {
                 ))}
             </div>
 
-            {/* ⬇️ Pin divider + bottom group together near the bottom */}
+            {/* bottom section */}
             <div className="mt-12">
               <div className="h-px w-full bg-[var(--sidebar-border)]" />
               <div className="mt-8 mb-8 space-y-1">
@@ -88,10 +94,9 @@ export function SidebarDesktop() {
         </ScrollArea>
       </div>
     </aside>
-  )
+  );
 }
 
-
 export function SidebarMobile() {
-  return null
+  return null;
 }
