@@ -6,7 +6,6 @@ import {
   CloudSun,
   ShoppingCart,
   Trash2,
-  ArrowUpDown,
   Scissors,
   Hammer,
   Droplets,
@@ -65,16 +64,19 @@ export default function ProductionFilters() {
     { label: "Protection",       value: "protection",     icon: Shield },
   ];
 
-  /* ------------ Handlers (no panel side-effects) ------------ */
+  /* ------------ Handlers ------------ */
   const clearTasks = () => {
     ui.setSelectedTasks([]);
     ui.setHideAllTasks(true);
+    // IMPORTANT: do NOT auto-open the Task Details panel from the filter
+    ui.closeTaskPanel?.();
   };
-
   const selectAllTasks = () => {
     const all = tasks.map((t) => t.value);
     ui.setSelectedTasks(all as any);
     ui.setHideAllTasks(false);
+    // IMPORTANT: do NOT auto-open the Task Details panel from the filter
+    ui.closeTaskPanel?.();
   };
 
   const clearCrops = () => {
@@ -142,7 +144,7 @@ export default function ProductionFilters() {
               />
             </div>
 
-            {/* Tasks (no drawer open/close here) */}
+            {/* Tasks */}
             <div className="inline-flex items-center gap-2">
               <ClipboardList className="size-4 text-[#02A78B]" />
               <TasksDropdown
@@ -151,6 +153,8 @@ export default function ProductionFilters() {
                 onChange={(next) => {
                   ui.setSelectedTasks(next as any);
                   ui.setHideAllTasks(false);
+                  // IMPORTANT: do NOT open panel here; single-click on a cell will open it
+                  ui.closeTaskPanel?.();
                 }}
                 onClearAll={clearTasks}
                 onSelectAll={selectAllTasks}
@@ -160,7 +164,7 @@ export default function ProductionFilters() {
           </div>
         </div>
 
-        {/* Right: Indicators */}
+        {/* Right: Indicators (no "Sort" anymore) */}
         <div className="flex flex-col gap-1">
           <span className="text-sm leading-none text-muted-foreground">Show:</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -187,12 +191,6 @@ export default function ProductionFilters() {
               label="Potential Loss"
               pressed={ui.indicators.loss}
               onPressedChange={(v) => ui.toggleIndicator("loss", v)}
-            />
-            <IndicatorToggle
-              icon={ArrowUpDown}
-              label="Sort"
-              pressed={ui.indicators.sort}
-              onPressedChange={(v) => ui.toggleIndicator("sort", v)}
             />
           </div>
         </div>

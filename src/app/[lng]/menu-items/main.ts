@@ -33,7 +33,7 @@ export const mainNav: NavItem[] = [
     ],
   },
   // Top-level items
-  { label: "Production", href: "/production", icon: Sprout },
+ { label: "Production", href: "/production", icon: Sprout },
   { label: "Sales",      href: "/sales",      icon: ShoppingCart },
 ];
 
