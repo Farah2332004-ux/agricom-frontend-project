@@ -1,35 +1,35 @@
 "use client";
 
 import { create } from "zustand";
+import { currentISOWeek } from "../components/common/weeks";
 
-type TabKey = "crops" | "clients";
+export type OrderChannelKey =
+  | "standing"
+  | "online"
+  | "email"
+  | "institution"
+  | "pack"
+  | "recipe"
+  | "box";
+
+export type PromoKey =
+  | "discount"
+  | "bundle"
+  | "free"
+  | "flash"
+  | "reward"
+  | "referral";
 
 type SalesUI = {
-  // crop + method
-  crop: string | null;
-  setCrop: (c: string | null) => void;
-  method: string | null;
-  setMethod: (m: string | null) => void;
-
   // filters
   selectedCrops: string[];
-  setSelectedCrops: (v: string[]) => void;
-  selectedOrders: string[];
-  setSelectedOrders: (v: string[]) => void;
-  selectedPromos: string[];
-  setSelectedPromos: (v: string[]) => void;
+  setSelectedCrops: (c: string[]) => void;
+  ordersFilter: OrderChannelKey[];
+  setOrdersFilter: (v: OrderChannelKey[]) => void;
+  promotionsFilter: PromoKey[];
+  setPromotionsFilter: (v: PromoKey[]) => void;
 
-  // tabs
-  tab: TabKey;
-  setTab: (t: TabKey) => void;
-
-  // scroller
-  weekStart: number;
-  window: number;
-  setWeekStart: (w: number) => void;
-  setWindow: (n: number) => void;
-
-  // order-types
+  // indicators (what to show)
   showConfirmed: boolean;
   setShowConfirmed: (v: boolean) => void;
   showPotential: boolean;
@@ -37,7 +37,6 @@ type SalesUI = {
   showExpected: boolean;
   setShowExpected: (v: boolean) => void;
 
-  // metrics
   showQuantity: boolean;
   setShowQuantity: (v: boolean) => void;
   showRevenue: boolean;
@@ -46,28 +45,32 @@ type SalesUI = {
   setShowPromoLinked: (v: boolean) => void;
   showChannelMix: boolean;
   setShowChannelMix: (v: boolean) => void;
+
+  // week scroller
+  weekStart: number;
+  window: number;
+  setWeekStart: (w: number) => void;
+  setWindow: (n: number) => void;
+
+  // tab
+  tab: "crops" | "clients";
+  setTab: (t: "crops" | "clients") => void;
+
+  // primary crop (used when none selected)
+  crop: string;
+  setCrop: (c: string) => void;
 };
 
+const { week } = currentISOWeek(); // local tz
 export const useSalesUI = create<SalesUI>((set) => ({
-  crop: "Broccoli",
-  setCrop: (crop) => set({ crop }),
-  method: null,
-  setMethod: (method) => set({ method }),
-
-  selectedCrops: ["Broccoli"],
+  selectedCrops: [],
   setSelectedCrops: (selectedCrops) => set({ selectedCrops }),
-  selectedOrders: [],
-  setSelectedOrders: (selectedOrders) => set({ selectedOrders }),
-  selectedPromos: [],
-  setSelectedPromos: (selectedPromos) => set({ selectedPromos }),
 
-  tab: "crops",
-  setTab: (tab) => set({ tab }),
+  ordersFilter: [],
+  setOrdersFilter: (ordersFilter) => set({ ordersFilter }),
 
-  weekStart: 40,
-  window: 12,
-  setWeekStart: (weekStart) => set({ weekStart }),
-  setWindow: (window) => set({ window }),
+  promotionsFilter: [],
+  setPromotionsFilter: (promotionsFilter) => set({ promotionsFilter }),
 
   showConfirmed: true,
   setShowConfirmed: (v) => set({ showConfirmed: v }),
@@ -84,4 +87,15 @@ export const useSalesUI = create<SalesUI>((set) => ({
   setShowPromoLinked: (v) => set({ showPromoLinked: v }),
   showChannelMix: true,
   setShowChannelMix: (v) => set({ showChannelMix: v }),
+
+  weekStart: week,
+  window: 16,
+  setWeekStart: (w) => set({ weekStart: w }),
+  setWindow: (n) => set({ window: n }),
+
+  tab: "crops",
+  setTab: (t) => set({ tab: t }),
+
+  crop: "Broccoli",
+  setCrop: (crop) => set({ crop }),
 }));

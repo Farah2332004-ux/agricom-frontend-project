@@ -1,3 +1,4 @@
+// src/app/[lng]/components/organisms/SalesFilters.tsx
 "use client";
 
 import * as React from "react";
@@ -7,35 +8,48 @@ import {
   Boxes,
   CircleDollarSign,
   User,
-  FileText,
-  CheckCircle2,
-  Clipboard,
-  Zap,
+  ClipboardList,  // Orders filter icon + base for Confirmed
+  Clipboard,      // base for Potential
+  Zap,            // small bolt overlay
   FileClock,
-  ClipboardList,
-  Filter as FilterIcon,
+  ShoppingBasket,
+  Receipt,
+  Mail,
+  Landmark,
+  Package,
+  BookOpen,
+  Box,
+  BadgePercent,
+  Truck,
+  Flashlight,
+  Trophy,
+  Share2,
+  Check,          // small check overlay
 } from "lucide-react";
 
 import CropsDropdown from "../molecules/CropsDropdown";
 import OrdersDropdown, { type OrdersItem } from "../molecules/OrdersDropdown";
-import PromotionsDropdown, { type PromotionsItem } from "../molecules/PromotionsDropdown";
+import PromotionsDropdown, { type PromoItem } from "../molecules/PromotionsDropdown";
 import IndicatorToggle from "../molecules/IndicatorToggle";
 import { useSalesUI } from "../../sales/ui";
 
 const BRAND = "#02A78B";
-const BORDER = "#E0F0ED";
 
-/** Screenshot-style icons */
-const ConfirmedIcon: React.FC<{ className?: string }> = ({ className }) => (
+/* -------- Composite icons that inherit color from the toggle (white) -------- */
+const ConfirmedDocIcon: React.FC<{ className?: string }> = ({ className }) => (
   <span className="relative inline-flex">
-    <FileText className={className} />
-    <CheckCircle2 className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5" style={{ color: BRAND }} />
+    {/* inherits .text-white and size from parent via className */}
+    <ClipboardList className={className} />
+    {/* tiny white check in the corner */}
+    <Check className="absolute -right-0.5 -bottom-0.5 h-3 w-3 text-white" />
   </span>
 );
-const PotentialIcon: React.FC<{ className?: string }> = ({ className }) => (
+
+const PotentialDocIcon: React.FC<{ className?: string }> = ({ className }) => (
   <span className="relative inline-flex">
     <Clipboard className={className} />
-    <Zap className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 text-emerald-600" />
+    {/* tiny white bolt in the corner */}
+    <Zap className="absolute -right-0.5 -bottom-0.5 h-3 w-3 text-white" />
   </span>
 );
 
@@ -43,24 +57,27 @@ export default function SalesFilters() {
   const ui = useSalesUI();
 
   const crops = ["Broccoli", "Tomato", "Potato", "Cabbage", "Onion", "Spinach"];
-  const methods = ["Organic","Conventional","Hydroponic","Urban","Aquaponic","Tunnel","GreenHouse","Open Field","Vertical Farming"];
+  const methods = ["Organic", "Conventional", "Hydroponic", "Open Field"];
 
+  // Orders (list remains the same)
   const ordersItems: OrdersItem[] = [
-    { value: "standing",     label: "Standing" },
-    { value: "online_shop",  label: "Online shop" },
-    { value: "email_ads",    label: "Email Ads" },
-    { value: "institution",  label: "Institutional" },
-    { value: "pack_station", label: "Pack station" },
-    { value: "recipe_packs", label: "Recipe Packs" },
-    { value: "box_based",    label: "Box-Based" },
+    { label: "Standing",     value: "standing",     icon: ShoppingBasket },
+    { label: "Online shop",  value: "online",       icon: Receipt },
+    { label: "Email Ads",    value: "email",        icon: Mail },
+    { label: "Institutional",value: "institution",  icon: Landmark },
+    { label: "Pack station", value: "pack",         icon: Package },
+    { label: "Recipe Packs", value: "recipe",       icon: BookOpen },
+    { label: "Box-Based",    value: "box",          icon: Box },
   ];
-  const promosItems: PromotionsItem[] = [
-    { value: "discount",     label: "Discount" },
-    { value: "bundle",       label: "Bundle" },
-    { value: "free_delivery",label: "Free Delivery" },
-    { value: "flash_offer",  label: "Flash Offer" },
-    { value: "reward",       label: "Reward" },
-    { value: "pack_referral",label: "Pack Referral" },
+
+  // Promotions (unchanged)
+  const promoItems: PromoItem[] = [
+    { label: "Discount",      value: "discount", icon: BadgePercent },
+    { label: "Bundle",        value: "bundle",   icon: Box },
+    { label: "Free Delivery", value: "free",     icon: Truck },
+    { label: "Flash Offer",   value: "flash",    icon: Flashlight },
+    { label: "Reward",        value: "reward",   icon: Trophy },
+    { label: "Pack Referral", value: "referral", icon: Share2 },
   ];
 
   return (
@@ -69,7 +86,7 @@ export default function SalesFilters() {
         {/* Left: Filters */}
         <div className="flex flex-col gap-1">
           <span className="inline-flex items-center gap-2 text-sm leading-none text-muted-foreground">
-            <FilterIcon className="size-4" /> Filter By:
+            Filter By:
           </span>
 
           <div className="flex flex-wrap items-center gap-5">
@@ -79,28 +96,24 @@ export default function SalesFilters() {
               <CropsDropdown
                 crops={crops}
                 methods={methods}
-                value={{ crops: ui.selectedCrops, method: ui.method }}
+                value={{ crops: ui.selectedCrops, method: null }}
                 onChange={(next) => {
                   ui.setSelectedCrops(next.crops ?? []);
-                  ui.setMethod(next.method ?? null);
                   if (next.crops && next.crops.length === 1) ui.setCrop(next.crops[0]);
                 }}
-                onClearAll={() => { ui.setSelectedCrops([]); ui.setMethod(null); }}
+                onClearAll={() => ui.setSelectedCrops([])}
                 onSelectAll={() => ui.setSelectedCrops(crops)}
                 label="Crops"
               />
             </div>
 
-            {/* Orders */}
+            {/* Orders — icon matches your “clipboard” reference */}
             <div className="inline-flex items-center gap-2">
               <ClipboardList className="size-4" style={{ color: BRAND }} />
               <OrdersDropdown
                 items={ordersItems}
-                value={ui.selectedOrders}
-                onChange={(v) => ui.setSelectedOrders(v)}
-                onClearAll={() => ui.setSelectedOrders([])}
-                onSelectAll={() => ui.setSelectedOrders(ordersItems.map(i => i.value))}
-                label="Orders"
+                value={ui.ordersFilter}
+                onChange={(next) => ui.setOrdersFilter(next)}
               />
             </div>
 
@@ -108,29 +121,27 @@ export default function SalesFilters() {
             <div className="inline-flex items-center gap-2">
               <Megaphone className="size-4" style={{ color: BRAND }} />
               <PromotionsDropdown
-                items={promosItems}
-                value={ui.selectedPromos}
-                onChange={(v) => ui.setSelectedPromos(v)}
-                onClearAll={() => ui.setSelectedPromos([])}
-                onSelectAll={() => ui.setSelectedPromos(promosItems.map(i => i.value))}
+                items={promoItems}
+                value={ui.promotionsFilter}
+                onChange={(next) => ui.setPromotionsFilter(next)}
                 label="Promotions"
               />
             </div>
           </div>
         </div>
 
-        {/* Right: Indicators (Show) */}
+        {/* Right: Indicators */}
         <div className="flex flex-col gap-1">
           <span className="text-sm leading-none text-muted-foreground">Show:</span>
           <div className="flex flex-wrap items-center gap-2">
             <IndicatorToggle
-              icon={ConfirmedIcon}
+              icon={(p) => <ConfirmedDocIcon className={p.className} />}
               label="Confirmed Orders"
               pressed={ui.showConfirmed}
               onPressedChange={(v) => ui.setShowConfirmed(v)}
             />
             <IndicatorToggle
-              icon={PotentialIcon}
+              icon={(p) => <PotentialDocIcon className={p.className} />}
               label="Potential Orders"
               pressed={ui.showPotential}
               onPressedChange={(v) => ui.setShowPotential(v)}
@@ -170,7 +181,7 @@ export default function SalesFilters() {
       </div>
 
       {/* divider */}
-      <div className="mt-3 h-px w-full" style={{ background: BORDER }} />
+      <div className="mt-3 h-px w-full bg-[#E0F0ED]" />
     </section>
   );
 }
