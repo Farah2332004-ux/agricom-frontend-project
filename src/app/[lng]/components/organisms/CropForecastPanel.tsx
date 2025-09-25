@@ -2,21 +2,23 @@
 "use client";
 
 import * as React from "react";
-import { X, Plus, AlertTriangle, Flame } from "lucide-react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  X,
+  AlertTriangle,
+  Sprout,
+  ShoppingCart,
+  CircleDollarSign,
+  BadgeCheck,
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-/* Align with WeekScroller */
-const LEFT_OFFSET  = "calc(2.25rem + 0.375rem - 0.5rem)";
+/* ---------------- Alignment with WeekScroller ---------------- */
+const LEFT_OFFSET = "calc(2.25rem + 0.375rem - 0.5rem)";
 const RIGHT_OFFSET = "calc(2.25rem + 0.375rem)";
+const BRAND = "#02A78B";
 const BORDER = "#E0F0ED";
-const BRAND  = "#02A78B";
 
-/* ---- helpers ---- */
+/* ---------------- Helpers ---------------- */
 function rng(seed: string) {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
@@ -26,190 +28,344 @@ function seriesInt(n: number, seed: string, min: number, max: number) {
   const r = rng(seed);
   return Array.from({ length: n }, () => Math.round(min + r() * (max - min)));
 }
-function colorFor(v: number, kind: "demand" | "price") {
-  if (kind === "demand") return v >= 85 ? "#EA4A3C" : v >= 65 ? "#F2AE48" : v >= 40 ? "#02A78B" : "#7AC4B2";
-  // price in $/kg 1–5
-  return v >= 4.2 ? "#EA4A3C" : v >= 3.2 ? "#F2AE48" : v >= 2.2 ? "#02A78B" : "#7AC4B2";
-}
-function bestWindow3(values: number[]) {
-  if (values.length < 3) return { start: 0, end: Math.min(2, values.length - 1) };
-  let bi = 0, bs = values[0] + values[1] + values[2];
-  for (let i = 1; i <= values.length - 3; i++) {
-    const s = values[i] + values[i + 1] + values[i + 2];
-    if (s > bs) { bs = s; bi = i; }
-  }
-  return { start: bi, end: bi + 2 };
+
+/** ISO week number (UTC basis; good enough here) */
+function isoWeek(d: Date): number {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  return Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 type Props = {
-  weeks: number[];
-  cropLabel: string;
+  weeks: number[];           // same weeks from WeekScroller
+  cropLabel: string;         // e.g., "Broccoli"
+  onClose: () => void;       // collapse the whole panel to title only (handled by page)
   className?: string;
 };
 
-export default function CropForecastPanel({ weeks, cropLabel, className = "" }: Props) {
-  const count = weeks.length;
-  const [collapsed, setCollapsed] = React.useState(false);
+type ShortData = {
+  week: number;
+  stockKg: number;
+  demandKg: number;
+  pricePerKg: number;
+  fulfillmentPct: number;
+};
 
-  // synthetic demo series (stable)
-  const demandIdx = React.useMemo(
-    () => seriesInt(count, `dem-${cropLabel}-${weeks.join(",")}`, 20, 100),
-    [count, cropLabel, weeks]
-  );
-  const priceKg = React.useMemo(
-    () => seriesInt(count, `prc-${cropLabel}-${weeks.join(",")}`, 12, 48).map(v => v / 10), // $1.2..$4.8
-    [count, cropLabel, weeks]
-  );
+/* ---------------- Color ramps ---------------- */
+const demandColor = (v: number) =>
+  v >= 1000 ? "#EA4A3C" : v >= 800 ? "#F2AE48" : v >= 600 ? "#02A78B" : "#7AC4B2";
 
-  const demandWin = bestWindow3(demandIdx);
-  const priceWin  = bestWindow3(priceKg);
+const priceColor = (v: number) =>
+  v >= 2.8 ? "#EA4A3C" : v >= 2.3 ? "#F2AE48" : v >= 1.8 ? "#02A78B" : "#7AC4B2";
 
-  const barFrameStyle: React.CSSProperties = { marginLeft: LEFT_OFFSET, marginRight: RIGHT_OFFSET };
-  const nowStr = new Date().toLocaleString(undefined, {
-    timeZone: "Europe/Berlin",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+/* ---------------- Subcomponents ---------------- */
+function SegmentedBar({
+  values,
+  getColor,
+  labelBuilder,
+  isClickableIndex,
+  onClickIndex,
+  warnings,
+}: {
+  values: number[];
+  getColor: (v: number) => string;
+  labelBuilder: (v: number, i: number) => React.ReactNode;
+  isClickableIndex: (i: number) => boolean;
+  onClickIndex: (i: number) => void;
+  warnings?: (v: number) => boolean;
+}) {
+  const barOuterStyle: React.CSSProperties = { marginLeft: LEFT_OFFSET, marginRight: RIGHT_OFFSET };
 
-  function WarningDot({
-    leftPct,
-    tooltipTitle,
-    tooltipBody,
-  }: {
-    leftPct: number;
-    tooltipTitle: string;
-    tooltipBody: string;
-  }) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className="absolute top-0 -translate-x-1/2 -translate-y-1"
-            style={{ left: `${leftPct}%` }}
-          >
-            <div className="rounded-full bg-white p-0.5 shadow">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          sideOffset={8}
-          className="bg-black text-white border-0 px-3 py-2 rounded-md text-xs"
+  return (
+    <div className="relative" style={barOuterStyle}>
+      {/* background bar (striped by segment) */}
+      <div className="h-4 rounded-full relative overflow-hidden">
+        <div
+          className="h-full w-full rounded-full relative"
+          style={{
+            background: `linear-gradient(to right, ${values
+              .map((v, i) => {
+                const color = getColor(v);
+                const startPos = (i / values.length) * 100;
+                const endPos = ((i + 1) / values.length) * 100;
+                return `${color} ${startPos}%, ${color} ${endPos}%`;
+              })
+              .join(", ")})`,
+          }}
         >
-          <div className="font-semibold">{tooltipTitle}</div>
-          <div className="mt-0.5 opacity-90">{tooltipBody}</div>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  function renderStrip(values: number[], kind: "demand" | "price") {
-    return (
-      <div className="relative" style={barFrameStyle}>
-        {/* Segmented gradient bar */}
-        <div className="h-4 rounded-full relative overflow-hidden">
-          <div
-            className="h-full w-full rounded-full"
-            style={{
-              background: `linear-gradient(to right, ${values.map((v, i) => {
-                const c = colorFor(v as number, kind);
-                const a = (i / values.length) * 100;
-                const b = ((i + 1) / values.length) * 100;
-                return `${c} ${a}%, ${c} ${b}%`;
-              }).join(", ")})`,
-            }}
-          />
+          {/* segment dividers */}
           {values.slice(0, -1).map((_, i) => (
             <div
-              key={`sep-${i}`}
+              key={`divider-${i}`}
               className="absolute top-0 bottom-0 w-px bg-white/60"
               style={{ left: `${((i + 1) / values.length) * 100}%` }}
             />
           ))}
         </div>
-
-        {/* Warning markers (overlay) */}
-        {values.map((v, i) => {
-          const show =
-            kind === "demand" ? v >= 85 : (v as number) >= 4.2; // high demand / high price
-          if (!show) return null;
-          const left = (i / values.length) * 100 + (100 / values.length) / 2;
-          return (
-            <WarningDot
-              key={`${kind}-warn-${i}`}
-              leftPct={left}
-              tooltipTitle={`Week ${weeks[i]} • Outlook`}
-              tooltipBody={kind === "demand" ? "High demand risk" : "Price peak risk"}
-            />
-          );
-        })}
       </div>
-    );
-  }
 
-  function renderBracket(win: { start: number; end: number }, values: number[], kind: "demand" | "price") {
-    const segW = 100 / values.length;
-    const leftPct = win.start * segW;
-    const widthPct = (win.end - win.start + 1) * segW;
-   
+      {/* hit targets + tooltips */}
+      {values.map((v, i) => {
+        const position = (i / values.length) * 100;
+        const width = 100 / values.length;
+        const clickable = isClickableIndex(i);
+        const hasWarning = warnings ? warnings(v) : false;
 
+        const click = () => clickable && onClickIndex(i);
 
-  }
+        return (
+          <Tooltip key={`wk-${i}`}>
+            <TooltipTrigger asChild>
+              <div
+                role={clickable ? "button" : "presentation"}
+                tabIndex={clickable ? 0 : -1}
+                className={`absolute top-0 h-4 ${clickable ? "cursor-pointer" : "cursor-default"}`}
+                style={{ left: `${position}%`, width: `${width}%` }}
+                onClick={click}
+                onKeyDown={(e) => (clickable && (e.key === "Enter" || e.key === " ")) ? click() : undefined}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              <div className="max-w-[260px] text-xs">{labelBuilder(v, i)}</div>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+
+      {/* warning glyphs (overlay) */}
+      {values.map((v, i) => {
+        const show = warnings ? warnings(v) : false;
+        if (!show) return null;
+        const position = (i / values.length) * 100 + 100 / values.length / 2;
+        return (
+          <div
+            key={`warning-${i}`}
+            className="absolute top-0 -translate-x-1/2 -translate-y-1"
+            style={{ left: `${position}%` }}
+          >
+            <AlertTriangle className="size-4 rounded-full bg-white p-0.5 text-red-500" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ShortTermStrip({
+  data,
+  onClose,
+}: {
+  data: ShortData;
+  onClose: () => void;
+}) {
+  const priceTag =
+    data.pricePerKg >= 2.8 ? "Very High 🔥" : data.pricePerKg >= 2.3 ? "High 🔥" : "Average";
+  const stockTag = "Average";
+  const demandTag = "Average";
+  const fulfillTag = data.fulfillmentPct >= 95 ? "Excellent" : data.fulfillmentPct >= 85 ? "Good" : "Fair";
+
+  return (
+    <div className="mt-3 rounded-2xl border bg-white px-4 py-3" style={{ borderColor: BORDER }}>
+      <div className="grid grid-cols-4 items-center gap-4">
+        {/* Available Stock */}
+        <div className="flex items-center gap-3">
+          <Sprout className="h-5 w-5" style={{ color: BRAND }} />
+          <div>
+            <div className="text-[13px] text-gray-700">Available Stock</div>
+            <div className="text-[18px] font-semibold text-black">
+              {data.stockKg.toLocaleString()} <span className="text-[13px] font-normal">kg</span>
+            </div>
+            <div className="text-xs text-emerald-600">{stockTag}</div>
+          </div>
+        </div>
+
+        {/* Total Demand */}
+        <div className="flex items-center gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
+          <ShoppingCart className="h-5 w-5" style={{ color: BRAND }} />
+          <div>
+            <div className="text-[13px] text-gray-700">Total Demand</div>
+            <div className="text-[18px] font-semibold text-black">
+              {data.demandKg.toLocaleString()} <span className="text-[13px] font-normal">kg</span>
+            </div>
+            <div className="text-xs text-emerald-600">{demandTag}</div>
+          </div>
+        </div>
+
+        {/* Price */}
+        <div className="flex items-center gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
+          <CircleDollarSign className="h-5 w-5" style={{ color: BRAND }} />
+          <div>
+            <div className="text-[13px] text-gray-700">Price</div>
+            <div className="text-[18px] font-semibold text-black">
+              {data.pricePerKg.toFixed(2)}
+              <span className="text-[13px] font-normal">$/kg</span>
+            </div>
+            <div className={`text-xs ${priceTag.includes("High") ? "text-orange-600" : "text-emerald-600"}`}>
+              {priceTag}
+            </div>
+          </div>
+        </div>
+
+        {/* Order Fulfillment + close */}
+        <div className="flex items-center justify-between gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
+          <div className="flex items-center gap-3">
+            <BadgeCheck className="h-5 w-5" style={{ color: BRAND }} />
+            <div>
+              <div className="text-[13px] text-gray-700">Order Fulfillment</div>
+              <div className="text-[18px] font-semibold text-black">{data.fulfillmentPct}%</div>
+              <div className="text-xs text-emerald-600">{fulfillTag}</div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close short-term panel"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Main ---------------- */
+export default function CropForecastPanel({
+  weeks,
+  cropLabel,
+  onClose,
+  className = "",
+}: Props) {
+  const count = weeks?.length ?? 0;
+  if (!count) return null;
+
+  // Synthetic series (seeded to weeks/crop for stability)
+  const demand = React.useMemo(
+    () => seriesInt(count, `dem-${cropLabel}-${weeks.join(",")}`, 420, 1200),
+    [count, weeks, cropLabel]
+  );
+  const price = React.useMemo(
+    () => seriesInt(count, `prc-${cropLabel}-${weeks.join(",")}`, 140, 320).map((v) => v / 100),
+    [count, weeks, cropLabel]
+  );
+  const stock = React.useMemo(
+    () => seriesInt(count, `stk-${cropLabel}-${weeks.join(",")}`, 700, 1300),
+    [count, weeks, cropLabel]
+  );
+
+  const currentWk = isoWeek(new Date());
+  const currentIndex = weeks.findIndex((w) => w === currentWk);
+
+  const [short, setShort] = React.useState<ShortData | null>(null);
+
+  const nowStr = new Date().toLocaleString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    weekday: "short",
+    month: "short",
+    day: "2-digit",
+  });
+
+  const isClickableIndex = (i: number) => i === currentIndex && currentIndex !== -1;
+  const openShortAt = (i: number) => {
+    if (i !== currentIndex) return;
+    const week = weeks[i];
+    const s = stock[i] ?? 0;
+    const d = demand[i] ?? 0;
+    const p = price[i] ?? 0;
+    const fulfill = Math.max(0, Math.min(100, Math.round((s / Math.max(1, d)) * 100)));
+    setShort({
+      week,
+      stockKg: s,
+      demandKg: d,
+      pricePerKg: p,
+      fulfillmentPct: fulfill,
+    });
+  };
+
+  const demandLabel = (v: number, i: number) => (
+    <div className="flex items-start gap-2">
+      <div className="font-medium">Week {weeks[i]} • {isClickableIndex(i) ? "Current" : "Outlook"}</div>
+      <div className="ml-auto tabular-nums">{v} kg</div>
+    </div>
+  );
+
+  const priceLabel = (v: number, i: number) => (
+    <div className="flex items-start gap-2">
+      <div className="font-medium">Week {weeks[i]} • {isClickableIndex(i) ? "Current" : "Outlook"}</div>
+      <div className="ml-auto tabular-nums">{v.toFixed(2)} $/kg</div>
+    </div>
+  );
+
+  const demandWarn = (v: number) => v >= 1000; // surge
+  const priceWarn = (v: number) => v >= 2.8;   // peak
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className={`rounded-2xl border bg-white p-4 shadow-sm ${className}`}>
+      <section
+        className={`rounded-2xl border bg-white p-4 shadow-sm ${className}`}
+        aria-label="Weekly Crop Forecast"
+        style={{ borderColor: BORDER }}
+      >
         {/* Header */}
-        <div className="mb-1 flex items-start justify-between">
-          <div
-            className="cursor-pointer select-none"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label="Toggle forecast panel"
-          >
-            <div className="text-[15px] font-semibold" style={{ color: BRAND }}>
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <div className="text-[15px] font-semibold text-[#02A78B]">
               Weekly Crop Forecast <span className="font-normal text-black">– {cropLabel}</span>
             </div>
             <div className="mt-1 text-xs text-muted-foreground">As of {nowStr}</div>
           </div>
           <button
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "Expand" : "Collapse"}
+            onClick={onClose}
+            aria-label="Collapse crop forecast"
             className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
           >
-            {collapsed ? <Plus className="size-4" /> : <X className="size-4" />}
+            <X className="size-4" />
           </button>
         </div>
 
-        {/* Collapsible body */}
-        {!collapsed && (
-          <>
-            {/* Demand */}
-            <div className="relative mb-4 flex items-center gap-4">
-              <div className="w-40 flex-shrink-0 text-[15px] font-medium" style={{ color: BRAND }}>
-                Forecast Demand
-              </div>
-              <div className="relative flex-1">
-                {renderStrip(demandIdx, "demand")}
-                <div className="pointer-events-none absolute inset-0" style={barFrameStyle}>
-                  {renderBracket(demandWin, demandIdx, "demand")}
-                </div>
-              </div>
-            </div>
+        {/* Demand row */}
+        <div className="mb-4 flex items-center gap-4">
+          <div className="w-40 flex-shrink-0 text-[15px] font-medium" style={{ color: BRAND }}>
+            Forecast Demand
+          </div>
+          <div className="flex-1">
+            <SegmentedBar
+              values={demand}
+              getColor={demandColor}
+              labelBuilder={demandLabel}
+              isClickableIndex={isClickableIndex}
+              onClickIndex={openShortAt}
+              warnings={demandWarn}
+            />
+          </div>
+        </div>
 
-            {/* Price */}
-            <div className="relative flex items-center gap-4">
-              <div className="w-40 flex-shrink-0 text-[15px] font-medium" style={{ color: BRAND }}>
-                Forecast Price /kg
-              </div>
-              <div className="relative flex-1">
-                {renderStrip(priceKg, "price")}
-                <div className="pointer-events-none absolute inset-0" style={barFrameStyle}>
-                  {renderBracket(priceWin, priceKg, "price")}
-                </div>
-              </div>
-            </div>
-          </>
+        {/* Price row */}
+        <div className="flex items-center gap-4">
+          <div className="w-40 flex-shrink-0 text-[15px] font-medium" style={{ color: BRAND }}>
+            Forecast Price /kg
+          </div>
+          <div className="flex-1">
+            <SegmentedBar
+              values={price}
+              getColor={priceColor}
+              labelBuilder={priceLabel}
+              isClickableIndex={isClickableIndex}
+              onClickIndex={openShortAt}
+              warnings={priceWarn}
+            />
+          </div>
+        </div>
+
+        {/* Short-term strip (only when current week clicked) */}
+        {short && (
+          <ShortTermStrip
+            data={short}
+            onClose={() => setShort(null)}
+          />
         )}
       </section>
     </TooltipProvider>

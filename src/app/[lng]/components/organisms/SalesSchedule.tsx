@@ -7,15 +7,13 @@ import { visibleWeeks } from "../common/weeks";
 import {
   ChevronDown,
 
-  // Crop header
-  Sprout,
-
-  // Order-type pictos (same set used in filters)
+  // Order-type pictos (close to your sheets)
   ShoppingBasket,  // Standing
   Smartphone,      // Online shop
   Mail,            // Email Ads
   Landmark,        // Institutional
   Package,         // Pack station
+  BookOpen,        // Recipe Packs
   Boxes,           // Box-Based
 
   // Section headers / indicators
@@ -25,7 +23,6 @@ import {
   CircleDollarSign,
   Megaphone,
   Users,
-  ClipboardList,   // "Orders" icon (match Filters)
 
   // Channels (client types)
   Store,           // Retailer
@@ -33,15 +30,8 @@ import {
   Utensils,        // HORCEA
   Factory,         // Processor
   Building,        // Public Sector
-
-  // “Mixed” glyphs
-  Layers,
-
-  // Clearer promo icons
-  BadgePercent,    // Discount
-  Truck,           // Free Delivery
-  Zap,             // Flash Offer
-  Trophy,          // Reward
+  Layers,          // “Mixed” icon for orders
+  Sprout,          // Crop icon for header
 } from "lucide-react";
 
 import { useSalesUI } from "../../sales/ui";
@@ -103,35 +93,42 @@ function valueFor(crop: string, orderType: OrderType, metric: Metric, week: numb
 type CatalogItem = { key:string; label:string; Icon: React.ElementType };
 
 const ORDER_TYPES = [
-  { key: "standing",    label: "Standing",      Icon: ShoppingBasket },
-  { key: "online",      label: "Online shop",   Icon: Smartphone },
-  { key: "email",       label: "Email Ads",     Icon: Mail },
-  { key: "institution", label: "Institutional", Icon: Landmark },
-  { key: "pack",        label: "Pack station",  Icon: Package },
-  { key: "box",         label: "Box-Based",     Icon: Boxes },
+  { key: "standing",    label: "Standing",     Icon: ShoppingBasket },
+  { key: "online",      label: "Online shop",  Icon: Smartphone },
+  { key: "email",       label: "Email Ads",    Icon: Mail },
+  { key: "institution", label: "Institutional",Icon: Landmark },
+  { key: "pack",        label: "Pack station", Icon: Package },
+  { key: "recipe",      label: "Recipe Packs", Icon: BookOpen },
+  { key: "box",         label: "Box-Based",    Icon: Boxes },
 ] as const;
 
+/* Simple promo icons as inline SVGs with currentColor so we can force green */
+function PercentIcon(props:any){ return <svg viewBox="0 0 24 24" className={props.className}><path fill={BRAND} d="M19 5L5 19M7 7.5A1.5 1.5 0 1 0 7 4.5a1.5 1.5 0 0 0 0 3Zm10 12a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/></svg>; }
+function TruckIcon(props:any){ return <svg viewBox="0 0 24 24" className={props.className}><path fill={BRAND} d="M3 7h10v7H3zM13 9h4l3 3v2h-7zM6 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>; }
+function ZapIcon(props:any){ return <svg viewBox="0 0 24 24" className={props.className}><path fill={BRAND} d="M13 2 3 14h7l-1 8 11-14h-7l1-6Z"/></svg>; }
+function GiftIcon(props:any){ return <svg viewBox="0 0 24 24" className={props.className}><path fill={BRAND} d="M20 12v8H4v-8h16ZM4 10h16V7H4v3Zm7-6c-1.1 0-2 .9-2 2v1h2c1.1 0 2-.9 2-2s-.9-2-2-2Zm6 2c0 1.1-.9 2-2 2h-2V6c0-1.1.9-2 2-2s2 .9 2 2Z"/></svg>; }
+
 const PROMO_TYPES = [
-  { key: "discount",  label: "Discount",      Icon: BadgePercent },
+  { key: "discount",  label: "Discount",      Icon: PercentIcon },
   { key: "bundle",    label: "Bundle",        Icon: Boxes },
-  { key: "free",      label: "Free Delivery", Icon: Truck },
-  { key: "flash",     label: "Flash Offer",   Icon: Zap },
-  { key: "reward",    label: "Reward",        Icon: Trophy },
+  { key: "free",      label: "Free Delivery", Icon: TruckIcon },
+  { key: "flash",     label: "Flash Offer",   Icon: ZapIcon },
+  { key: "reward",    label: "Reward",        Icon: GiftIcon },
   { key: "referral",  label: "Pack Referral", Icon: Package },
 ] as const;
 
 const CHANNELS = [
-  { key: "retailer",   label: "Retailer",      Icon: Store },
-  { key: "online",     label: "Online Shop",   Icon: Smartphone },
-  { key: "warehouse",  label: "Warehouse",     Icon: Home },
-  { key: "horcea",     label: "HORCEA",        Icon: Utensils },
-  { key: "institution",label: "Institution",   Icon: Landmark },
-  { key: "processor",  label: "Processor",     Icon: Factory },
-  { key: "association",label: "Association",   Icon: Users },
-  { key: "public",     label: "Public Sector", Icon: Building },
+  { key: "retailer",   label: "Retailer",     Icon: Store },
+  { key: "online",     label: "Online Shop",  Icon: Smartphone },
+  { key: "warehouse",  label: "Warehouse",    Icon: Home },
+  { key: "horcea",     label: "HORCEA",       Icon: Utensils },
+  { key: "institution",label: "Institution",  Icon: Landmark },
+  { key: "processor",  label: "Processor",    Icon: Factory },
+  { key: "association",label: "Association",  Icon: Users },
+  { key: "public",     label: "Public Sector",Icon: Building },
 ] as const;
 
-/* Seeded distribution helper */
+/* Seeded distribution helper: returns keyed items so we can filter */
 function pickDistribution(seed: string, catalog: readonly CatalogItem[], minItems=1, maxItems=3) {
   const r = rng(seed);
   const count = Math.max(minItems, Math.min(maxItems, 1 + Math.floor(r() * maxItems)));
@@ -148,7 +145,7 @@ function pickDistribution(seed: string, catalog: readonly CatalogItem[], minItem
       ? Math.max(0, 100 - sum(weights.slice(0,-1).map(v=>Math.round((v/total)*100))))
       : Math.round((w/total)*100)
   );
-  return chosen.map((c,i)=>({ label: c.label, Icon: c.Icon, pct: pct[i] }));
+  return chosen.map((c,i)=>({ key: c.key, label: c.label, Icon: c.Icon, pct: pct[i] }));
 }
 function dominant<T extends {pct:number}>(dist: T[]) {
   return dist.slice().sort((a,b)=>b.pct-a.pct)[0];
@@ -167,6 +164,11 @@ function ValueCell({ children }: { children: React.ReactNode }) {
     <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white text-[12px]" style={{ borderColor: BORDER }}>
       {children}
     </div>
+  );
+}
+function EmptyCell() {
+  return (
+    <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white" style={{ borderColor: BORDER }} />
   );
 }
 function SectionHeading({
@@ -191,7 +193,7 @@ function SectionHeading({
   );
 }
 
-/** Left-label aligned EXACTLY under section title. */
+/** Left-label aligned EXACTLY under section title (chevron spacer keeps x position). */
 function SubRowLabel({
   Icon, children, unitLabel,
 }: {
@@ -201,7 +203,6 @@ function SubRowLabel({
 }) {
   return (
     <div className="flex items-center gap-2 px-2 text-[15px]">
-      {/* Spacer equal to chevron button (keeps same x as section title) */}
       <span className="inline-flex h-6 w-6 shrink-0" />
       <Icon className="size-4" style={{ color: BRAND }} />
       <span>{children}</span>
@@ -256,6 +257,11 @@ function MixCell({
   mixIcon: React.ElementType;
   title: string;
 }) {
+  // If distribution is empty after filtering, render an empty bordered cell
+  if (!dist || dist.length === 0) {
+    return <EmptyCell />;
+  }
+
   const isMix = dist.length > 1;
   const dom = dominant(dist);
   const Icon = isMix ? MixIcon : dom.Icon;
@@ -280,7 +286,7 @@ function MixCell({
   );
 }
 
-/** Whole row showing icon-only cells for each week + popup */
+/** Whole row showing icon-only cells for each week + popup, with optional filtering by keys */
 function MixRow({
   rowIcon: RowIcon,
   label,
@@ -289,6 +295,7 @@ function MixRow({
   seedOf,
   weeks,
   mixIcon: MixIcon,
+  filterKeys, // <- NEW: restrict which items can appear
 }: {
   rowIcon: React.ElementType;
   label: string;
@@ -297,18 +304,29 @@ function MixRow({
   seedOf: (w: number) => string;
   weeks: number[];
   mixIcon: React.ElementType;
+  filterKeys?: string[] | null;
 }) {
+  const keys = (filterKeys ?? []).filter(Boolean);
+
   return (
     <div className="mb-2" style={rowGridStyle()}>
       <SubRowLabel Icon={RowIcon}>{label}</SubRowLabel>
 
       <div style={weekColsStyle(weeks.length)}>
         {weeks.map((w) => {
-          const dist = pickDistribution(seedOf(w), catalog as CatalogItem[], 1, 3);
+          // 1) build a weekly distribution
+          const fullDist = pickDistribution(seedOf(w), catalog as CatalogItem[], 1, 3);
+
+          // 2) filter by keys (if provided)
+          const filtered = keys.length
+            ? fullDist.filter((d) => keys.includes(d.key))
+            : fullDist;
+
+          // 3) pass filtered dist; MixCell renders empty if none
           return (
             <MixCell
               key={`${label}-${w}`}
-              dist={dist}
+              dist={filtered}
               mixIcon={MixIcon}
               title={titleForPopup}
             />
@@ -361,6 +379,7 @@ function NumericRow({
 export default function SalesSchedule() {
   const ui = useSalesUI();
 
+  // Only the "Crops" tab renders this schedule
   if ((ui.tab ?? "crops") !== "crops") {
     return (
       <section className="mt-6 rounded-2xl border border-[#E0F0ED] bg-white p-6 text-sm text-muted-foreground">
@@ -372,17 +391,17 @@ export default function SalesSchedule() {
   const weeks = visibleWeeks(ui.weekStart, ui.window, 1, 52, true);
   const cropsToRender = (ui.selectedCrops?.length ? ui.selectedCrops : [ui.crop ?? "Broccoli"]) as string[];
 
-  // crop-level expand/collapse
-  const [cropOpen, setCropOpen] = React.useState<Record<string, boolean>>({});
-  const toggleCrop = (c: string) => setCropOpen((m) => ({ ...m, [c]: !(m[c] ?? true) }));
+  // Filters from UI store (normalize to arrays)
+  const ordersFilter = Array.isArray(ui.ordersFilter) ? (ui.ordersFilter as string[]) : [];
+  const promosFilter = Array.isArray(ui.promotionsFilter) ? (ui.promotionsFilter as string[]) : [];
 
-  // per-order-type expand/collapse
   const [openMap, setOpenMap] = React.useState<Record<string, { confirmed: boolean; potential: boolean; expected: boolean }>>({});
-  const toggleType = (crop: string, key: keyof (typeof openMap)[string]) =>
+  const toggle = (crop: string, key: keyof (typeof openMap)[string]) =>
     setOpenMap((m) => ({ ...m, [crop]: { confirmed: true, potential: true, expected: true, ...m[crop], [key]: !(m[crop]?.[key] ?? true) } }));
 
   return (
     <section className="mt-6">
+      {/* Week scroller */}
       <WeekScroller
         weekStart={ui.weekStart}
         window={ui.window}
@@ -392,27 +411,20 @@ export default function SalesSchedule() {
         wrap
       />
 
+      {/* For each crop */}
       {cropsToRender.map((cropName) => {
         const headerTotals = weeks.map((w) => valueFor(cropName, "confirmed", "quantity", w));
         const headerTotal = sum(headerTotals);
-        const cropIsOpen = cropOpen[cropName] ?? true;
-        const typeState = openMap[cropName] ?? { confirmed: true, potential: true, expected: true };
+        const openState = openMap[cropName] ?? { confirmed: true, potential: true, expected: true };
 
         return (
           <React.Fragment key={cropName}>
-            {/* Crop header row (with working chevron) */}
+            {/* Crop header row */}
             <div className="mb-2 mt-6" style={rowGridStyle()}>
               <div className="flex h-8 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleCrop(cropName)}
-                  aria-expanded={cropIsOpen}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] border"
-                  style={{ borderColor: BORDER, color: BRAND }}
-                >
-                  <ChevronDown className={`size-4 transition-transform ${cropIsOpen ? "" : "-rotate-90"}`} />
-                </button>
-
+                <div className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] border" style={{ borderColor: BORDER, color: BRAND }}>
+                  <ChevronDown className="size-4 opacity-0" />
+                </div>
                 <div className="flex items-center gap-2 text-[15px] font-semibold">
                   <Sprout className="size-4" style={{ color: BRAND }} />
                   {cropName}
@@ -430,223 +442,225 @@ export default function SalesSchedule() {
               </div>
             </div>
 
-            {!cropIsOpen ? null : (
+            {/* Confirmed */}
+            {ui.showConfirmed && (
               <>
-                {/* Confirmed */}
-                {ui.showConfirmed && (
+                <div className="mt-3" style={rowGridStyle()}>
+                  <SectionHeading
+                    open={openState.confirmed}
+                    onToggle={() => toggle(cropName, "confirmed")}
+                    Icon={ListChecks}
+                    label="Confirmed Orders"
+                  />
+                  <div />
+                  <div />
+                </div>
+
+                {openState.confirmed && (
                   <>
-                    <div className="mt-3" style={rowGridStyle()}>
-                      <SectionHeading
-                        open={typeState.confirmed}
-                        onToggle={() => toggleType(cropName, "confirmed")}
-                        Icon={ListChecks}
-                        label="Confirmed Orders"
+                    <MixRow
+                      rowIcon={BookOpen}
+                      label="Order Type"
+                      catalog={ORDER_TYPES as unknown as CatalogItem[]}
+                      titleForPopup="Order Type mix"
+                      seedOf={(w) => `${cropName}:confirmed:orders:${w}`}
+                      weeks={weeks}
+                      mixIcon={Layers}
+                      filterKeys={ordersFilter}     // <-- filter by Orders
+                    />
+
+                    {ui.showQuantity && (
+                      <NumericRow
+                        label="Quantity"
+                        icon={Boxes}
+                        unitLabel="(kg)"
+                        getVal={(w) => valueFor(cropName, "confirmed", "quantity", w)}
+                        weeks={weeks}
                       />
-                      <div />
-                      <div />
-                    </div>
+                    )}
+                    {ui.showRevenue && (
+                      <NumericRow
+                        label="Revenue"
+                        icon={CircleDollarSign}
+                        unitLabel="($)"
+                        getVal={(w) => valueFor(cropName, "confirmed", "revenue", w)}
+                        weeks={weeks}
+                      />
+                    )}
 
-                    {typeState.confirmed && (
-                      <>
-                        <MixRow
-                          rowIcon={ClipboardList}  // SAME icon as Filters “Orders”
-                          label="Order Type"
-                          catalog={ORDER_TYPES as unknown as CatalogItem[]}
-                          titleForPopup="Order Type mix"
-                          seedOf={(w) => `${cropName}:confirmed:orders:${w}`}
-                          weeks={weeks}
-                          mixIcon={Layers}
-                        />
+                    {ui.showPromoLinked && (
+                      <MixRow
+                        rowIcon={Megaphone}
+                        label="Promotion"
+                        catalog={PROMO_TYPES as unknown as CatalogItem[]}
+                        titleForPopup="Promotion mix"
+                        seedOf={(w) => `${cropName}:confirmed:promos:${w}`}
+                        weeks={weeks}
+                        mixIcon={Megaphone}
+                        filterKeys={promosFilter}   // <-- filter by Promotions
+                      />
+                    )}
 
-                        {ui.showQuantity && (
-                          <NumericRow
-                            label="Quantity"
-                            icon={Boxes}
-                            unitLabel="(kg)"
-                            getVal={(w) => valueFor(cropName, "confirmed", "quantity", w)}
-                            weeks={weeks}
-                          />
-                        )}
-                        {ui.showRevenue && (
-                          <NumericRow
-                            label="Revenue"
-                            icon={CircleDollarSign}
-                            unitLabel="($)"
-                            getVal={(w) => valueFor(cropName, "confirmed", "revenue", w)}
-                            weeks={weeks}
-                          />
-                        )}
-
-                        {ui.showPromoLinked && (
-                          <MixRow
-                            rowIcon={Megaphone}
-                            label="Promotion"
-                            catalog={PROMO_TYPES as unknown as CatalogItem[]}
-                            titleForPopup="Promotion mix"
-                            seedOf={(w) => `${cropName}:confirmed:promos:${w}`}
-                            weeks={weeks}
-                            mixIcon={Megaphone}
-                          />
-                        )}
-
-                        {ui.showChannelMix && (
-                          <MixRow
-                            rowIcon={Users}
-                            label="Channel Mix"
-                            catalog={CHANNELS as unknown as CatalogItem[]}
-                            titleForPopup="Channel mix"
-                            seedOf={(w) => `${cropName}:confirmed:channels:${w}`}
-                            weeks={weeks}
-                            mixIcon={Users}
-                          />
-                        )}
-                      </>
+                    {ui.showChannelMix && (
+                      <MixRow
+                        rowIcon={Users}
+                        label="Channel Mix"
+                        catalog={CHANNELS as unknown as CatalogItem[]}
+                        titleForPopup="Channel mix"
+                        seedOf={(w) => `${cropName}:confirmed:channels:${w}`}
+                        weeks={weeks}
+                        mixIcon={Users}
+                      />
                     )}
                   </>
                 )}
+              </>
+            )}
 
-                {/* Potential */}
-                {ui.showPotential && (
+            {/* Potential */}
+            {ui.showPotential && (
+              <>
+                <div className="mt-3" style={rowGridStyle()}>
+                  <SectionHeading
+                    open={openState.potential}
+                    onToggle={() => toggle(cropName, "potential")}
+                    Icon={Clipboard}
+                    label="Potential Orders"
+                  />
+                  <div />
+                  <div />
+                </div>
+
+                {openState.potential && (
                   <>
-                    <div className="mt-3" style={rowGridStyle()}>
-                      <SectionHeading
-                        open={typeState.potential}
-                        onToggle={() => toggleType(cropName, "potential")}
-                        Icon={Clipboard}
-                        label="Potential Orders"
+                    <MixRow
+                      rowIcon={BookOpen}
+                      label="Order Type"
+                      catalog={ORDER_TYPES as unknown as CatalogItem[]}
+                      titleForPopup="Order Type mix"
+                      seedOf={(w) => `${cropName}:potential:orders:${w}`}
+                      weeks={weeks}
+                      mixIcon={Layers}
+                      filterKeys={ordersFilter}     // <-- filter by Orders
+                    />
+
+                    {ui.showQuantity && (
+                      <NumericRow
+                        label="Quantity"
+                        icon={Boxes}
+                        unitLabel="(kg)"
+                        getVal={(w) => valueFor(cropName, "potential", "quantity", w)}
+                        weeks={weeks}
                       />
-                      <div />
-                      <div />
-                    </div>
+                    )}
+                    {ui.showRevenue && (
+                      <NumericRow
+                        label="Revenue"
+                        icon={CircleDollarSign}
+                        unitLabel="($)"
+                        getVal={(w) => valueFor(cropName, "potential", "revenue", w)}
+                        weeks={weeks}
+                      />
+                    )}
 
-                    {typeState.potential && (
-                      <>
-                        <MixRow
-                          rowIcon={ClipboardList}
-                          label="Order Type"
-                          catalog={ORDER_TYPES as unknown as CatalogItem[]}
-                          titleForPopup="Order Type mix"
-                          seedOf={(w) => `${cropName}:potential:orders:${w}`}
-                          weeks={weeks}
-                          mixIcon={Layers}
-                        />
+                    {ui.showPromoLinked && (
+                      <MixRow
+                        rowIcon={Megaphone}
+                        label="Promotion"
+                        catalog={PROMO_TYPES as unknown as CatalogItem[]}
+                        titleForPopup="Promotion mix"
+                        seedOf={(w) => `${cropName}:potential:promos:${w}`}
+                        weeks={weeks}
+                        mixIcon={Megaphone}
+                        filterKeys={promosFilter}   // <-- filter by Promotions
+                      />
+                    )}
 
-                        {ui.showQuantity && (
-                          <NumericRow
-                            label="Quantity"
-                            icon={Boxes}
-                            unitLabel="(kg)"
-                            getVal={(w) => valueFor(cropName, "potential", "quantity", w)}
-                            weeks={weeks}
-                          />
-                        )}
-                        {ui.showRevenue && (
-                          <NumericRow
-                            label="Revenue"
-                            icon={CircleDollarSign}
-                            unitLabel="($)"
-                            getVal={(w) => valueFor(cropName, "potential", "revenue", w)}
-                            weeks={weeks}
-                          />
-                        )}
-
-                        {ui.showPromoLinked && (
-                          <MixRow
-                            rowIcon={Megaphone}
-                            label="Promotion"
-                            catalog={PROMO_TYPES as unknown as CatalogItem[]}
-                            titleForPopup="Promotion mix"
-                            seedOf={(w) => `${cropName}:potential:promos:${w}`}
-                            weeks={weeks}
-                            mixIcon={Megaphone}
-                          />
-                        )}
-
-                        {ui.showChannelMix && (
-                          <MixRow
-                            rowIcon={Users}
-                            label="Channel Mix"
-                            catalog={CHANNELS as unknown as CatalogItem[]}
-                            titleForPopup="Channel mix"
-                            seedOf={(w) => `${cropName}:potential:channels:${w}`}
-                            weeks={weeks}
-                            mixIcon={Users}
-                          />
-                        )}
-                      </>
+                    {ui.showChannelMix && (
+                      <MixRow
+                        rowIcon={Users}
+                        label="Channel Mix"
+                        catalog={CHANNELS as unknown as CatalogItem[]}
+                        titleForPopup="Channel mix"
+                        seedOf={(w) => `${cropName}:potential:channels:${w}`}
+                        weeks={weeks}
+                        mixIcon={Users}
+                      />
                     )}
                   </>
                 )}
+              </>
+            )}
 
-                {/* Expected */}
-                {ui.showExpected && (
+            {/* Expected */}
+            {ui.showExpected && (
+              <>
+                <div className="mt-3" style={rowGridStyle()}>
+                  <SectionHeading
+                    open={openState.expected}
+                    onToggle={() => toggle(cropName, "expected")}
+                    Icon={FileClock}
+                    label="Expected Orders"
+                  />
+                  <div />
+                  <div />
+                </div>
+
+                {openState.expected && (
                   <>
-                    <div className="mt-3" style={rowGridStyle()}>
-                      <SectionHeading
-                        open={typeState.expected}
-                        onToggle={() => toggleType(cropName, "expected")}
-                        Icon={FileClock}
-                        label="Expected Orders"
+                    <MixRow
+                      rowIcon={BookOpen}
+                      label="Order Type"
+                      catalog={ORDER_TYPES as unknown as CatalogItem[]}
+                      titleForPopup="Order Type mix"
+                      seedOf={(w) => `${cropName}:expected:orders:${w}`}
+                      weeks={weeks}
+                      mixIcon={Layers}
+                      filterKeys={ordersFilter}     // <-- filter by Orders
+                    />
+
+                    {ui.showQuantity && (
+                      <NumericRow
+                        label="Quantity"
+                        icon={Boxes}
+                        unitLabel="(kg)"
+                        getVal={(w) => valueFor(cropName, "expected", "quantity", w)}
+                        weeks={weeks}
                       />
-                      <div />
-                      <div />
-                    </div>
+                    )}
+                    {ui.showRevenue && (
+                      <NumericRow
+                        label="Revenue"
+                        icon={CircleDollarSign}
+                        unitLabel="($)"
+                        getVal={(w) => valueFor(cropName, "expected", "revenue", w)}
+                        weeks={weeks}
+                      />
+                    )}
 
-                    {typeState.expected && (
-                      <>
-                        <MixRow
-                          rowIcon={ClipboardList}
-                          label="Order Type"
-                          catalog={ORDER_TYPES as unknown as CatalogItem[]}
-                          titleForPopup="Order Type mix"
-                          seedOf={(w) => `${cropName}:expected:orders:${w}`}
-                          weeks={weeks}
-                          mixIcon={Layers}
-                        />
+                    {ui.showPromoLinked && (
+                      <MixRow
+                        rowIcon={Megaphone}
+                        label="Promotion"
+                        catalog={PROMO_TYPES as unknown as CatalogItem[]}
+                        titleForPopup="Promotion mix"
+                        seedOf={(w) => `${cropName}:expected:promos:${w}`}
+                        weeks={weeks}
+                        mixIcon={Megaphone}
+                        filterKeys={promosFilter}   // <-- filter by Promotions
+                      />
+                    )}
 
-                        {ui.showQuantity && (
-                          <NumericRow
-                            label="Quantity"
-                            icon={Boxes}
-                            unitLabel="(kg)"
-                            getVal={(w) => valueFor(cropName, "expected", "quantity", w)}
-                            weeks={weeks}
-                          />
-                        )}
-                        {ui.showRevenue && (
-                          <NumericRow
-                            label="Revenue"
-                            icon={CircleDollarSign}
-                            unitLabel="($)"
-                            getVal={(w) => valueFor(cropName, "expected", "revenue", w)}
-                            weeks={weeks}
-                          />
-                        )}
-
-                        {ui.showPromoLinked && (
-                          <MixRow
-                            rowIcon={Megaphone}
-                            label="Promotion"
-                            catalog={PROMO_TYPES as unknown as CatalogItem[]}
-                            titleForPopup="Promotion mix"
-                            seedOf={(w) => `${cropName}:expected:promos:${w}`}
-                            weeks={weeks}
-                            mixIcon={Megaphone}
-                          />
-                        )}
-
-                        {ui.showChannelMix && (
-                          <MixRow
-                            rowIcon={Users}
-                            label="Channel Mix"
-                            catalog={CHANNELS as unknown as CatalogItem[]}
-                            titleForPopup="Channel mix"
-                            seedOf={(w) => `${cropName}:expected:channels:${w}`}
-                            weeks={weeks}
-                            mixIcon={Users}
-                          />
-                        )}
-                      </>
+                    {ui.showChannelMix && (
+                      <MixRow
+                        rowIcon={Users}
+                        label="Channel Mix"
+                        catalog={CHANNELS as unknown as CatalogItem[]}
+                        titleForPopup="Channel mix"
+                        seedOf={(w) => `${cropName}:expected:channels:${w}`}
+                        weeks={weeks}
+                        mixIcon={Users}
+                      />
                     )}
                   </>
                 )}
