@@ -1,4 +1,3 @@
-// src/app/[lng]/components/organisms/SalesFilters.tsx
 "use client";
 
 import * as React from "react";
@@ -7,10 +6,9 @@ import {
   Megaphone,
   Boxes,
   CircleDollarSign,
-  User,
-  ClipboardList,  // Orders filter icon + base for Confirmed
-  Clipboard,      // base for Potential
-  Zap,            // small bolt overlay
+  Users,
+  ListChecks,
+  Clipboard,
   FileClock,
   ShoppingBasket,
   Receipt,
@@ -24,61 +22,111 @@ import {
   Flashlight,
   Trophy,
   Share2,
-  Check,          // small check overlay
+  ShoppingCart,
+  Smartphone,
+  Store,
+  Home,
+  Utensils,
+  Factory,
+  Building,
 } from "lucide-react";
 
 import CropsDropdown from "../molecules/CropsDropdown";
 import OrdersDropdown, { type OrdersItem } from "../molecules/OrdersDropdown";
 import PromotionsDropdown, { type PromoItem } from "../molecules/PromotionsDropdown";
+import ClientsDropdown, { type ClientItem } from "../molecules/ClientsDropdown";
 import IndicatorToggle from "../molecules/IndicatorToggle";
 import { useSalesUI } from "../../sales/ui";
 
 const BRAND = "#02A78B";
 
-/* -------- Composite icons that inherit color from the toggle (white) -------- */
-const ConfirmedDocIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <span className="relative inline-flex">
-    {/* inherits .text-white and size from parent via className */}
-    <ClipboardList className={className} />
-    {/* tiny white check in the corner */}
-    <Check className="absolute -right-0.5 -bottom-0.5 h-3 w-3 text-white" />
-  </span>
-);
-
-const PotentialDocIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <span className="relative inline-flex">
-    <Clipboard className={className} />
-    {/* tiny white bolt in the corner */}
-    <Zap className="absolute -right-0.5 -bottom-0.5 h-3 w-3 text-white" />
-  </span>
-);
-
 export default function SalesFilters() {
   const ui = useSalesUI();
+  const tab = ui.tab ?? "crops";
 
   const crops = ["Broccoli", "Tomato", "Potato", "Cabbage", "Onion", "Spinach"];
   const methods = ["Organic", "Conventional", "Hydroponic", "Open Field"];
 
-  // Orders (list remains the same)
   const ordersItems: OrdersItem[] = [
-    { label: "Standing",     value: "standing",     icon: ShoppingBasket },
-    { label: "Online shop",  value: "online",       icon: Receipt },
-    { label: "Email Ads",    value: "email",        icon: Mail },
-    { label: "Institutional",value: "institution",  icon: Landmark },
-    { label: "Pack station", value: "pack",         icon: Package },
-    { label: "Recipe Packs", value: "recipe",       icon: BookOpen },
-    { label: "Box-Based",    value: "box",          icon: Box },
+    { label: "Standing", value: "standing", icon: ShoppingBasket },
+    { label: "Online shop", value: "online", icon: Receipt },
+    { label: "Email Ads", value: "email", icon: Mail },
+    { label: "Institutional", value: "institution", icon: Landmark },
+    { label: "Pack station", value: "pack", icon: Package },
+    { label: "Recipe Packs", value: "recipe", icon: BookOpen },
+    { label: "Box-Based", value: "box", icon: Box },
   ];
 
-  // Promotions (unchanged)
   const promoItems: PromoItem[] = [
-    { label: "Discount",      value: "discount", icon: BadgePercent },
-    { label: "Bundle",        value: "bundle",   icon: Box },
-    { label: "Free Delivery", value: "free",     icon: Truck },
-    { label: "Flash Offer",   value: "flash",    icon: Flashlight },
-    { label: "Reward",        value: "reward",   icon: Trophy },
+    { label: "Discount", value: "discount", icon: BadgePercent },
+    { label: "Bundle", value: "bundle", icon: Box },
+    { label: "Free Delivery", value: "free", icon: Truck },
+    { label: "Flash Offer", value: "flash", icon: Flashlight },
+    { label: "Reward", value: "reward", icon: Trophy },
     { label: "Pack Referral", value: "referral", icon: Share2 },
   ];
+
+  // Clients filter sections (values map 1:1 with schedule constants)
+  const CHANNELS: ClientItem[] = [
+    { label: "Retailer",     value: "retailer",    icon: Store },
+    { label: "Online Shop",  value: "online",      icon: Smartphone },
+    { label: "Warehouse",    value: "warehouse",   icon: Home },
+    { label: "HORCEA",       value: "horcea",      icon: Utensils },
+    { label: "Institution",  value: "institution", icon: Landmark },
+    { label: "Processor",    value: "processor",   icon: Factory },
+    { label: "Association",  value: "association", icon: Users },
+    { label: "Public Sector",value: "public",      icon: Building },
+  ];
+  const SEGMENTS: ClientItem[] = [
+    { label: "VIP",         value: "vip",      icon: Users },
+    { label: "Family Pack", value: "family",   icon: Users },
+    { label: "Student",     value: "student",  icon: Users },
+    { label: "Business",    value: "business", icon: Users },
+  ];
+  const PERSONAS: ClientItem[] = [
+    { label: "Bulk Buyer",     value: "bulk",        icon: ShoppingBasket },
+    { label: "Chef/Caterer",   value: "chef",        icon: Utensils },
+    { label: "Procurement",    value: "procurement", icon: Mail },
+    { label: "Health-Conscious", value: "health",    icon: BookOpen },
+  ];
+
+  const renderMainFilter = () => {
+    if (tab === "clients") {
+      return (
+        <div className="inline-flex items-center gap-2">
+          <Users className="size-4" style={{ color: BRAND }} />
+          <ClientsDropdown
+            label="Clients"
+            value={ui.clientsSelected}
+            onChange={(next) => ui.setClientsSelected(next)}
+            sections={[
+              { title: "Channel", items: CHANNELS },
+              { title: "Segment", items: SEGMENTS },
+              { title: "Persona", items: PERSONAS },
+            ]}
+          />
+        </div>
+      );
+    }
+    // CROPS tab (default)
+    return (
+      <div className="inline-flex items-center gap-2">
+        <Sprout className="size-4" style={{ color: BRAND }} />
+        <CropsDropdown
+          crops={crops}
+          methods={methods}
+          value={{ crops: ui.selectedCrops, method: null }}
+          onChange={(next) => {
+            ui.setSelectedCrops(next.crops ?? []);
+            if (next.crops && next.crops.length === 1) ui.setCrop(next.crops[0]);
+          }}
+          onClearAll={() => ui.setSelectedCrops([])}
+          onSelectAll={() => ui.setSelectedCrops(crops)}
+          label="Crops"
+        />
+      </div>
+    );
+  };
 
   return (
     <section className="mb-3 w-full">
@@ -90,26 +138,11 @@ export default function SalesFilters() {
           </span>
 
           <div className="flex flex-wrap items-center gap-5">
-            {/* Crops */}
-            <div className="inline-flex items-center gap-2">
-              <Sprout className="size-4" style={{ color: BRAND }} />
-              <CropsDropdown
-                crops={crops}
-                methods={methods}
-                value={{ crops: ui.selectedCrops, method: null }}
-                onChange={(next) => {
-                  ui.setSelectedCrops(next.crops ?? []);
-                  if (next.crops && next.crops.length === 1) ui.setCrop(next.crops[0]);
-                }}
-                onClearAll={() => ui.setSelectedCrops([])}
-                onSelectAll={() => ui.setSelectedCrops(crops)}
-                label="Crops"
-              />
-            </div>
+            {renderMainFilter()}
 
-            {/* Orders — icon matches your “clipboard” reference */}
+            {/* Orders */}
             <div className="inline-flex items-center gap-2">
-              <ClipboardList className="size-4" style={{ color: BRAND }} />
+              <ShoppingCart className="size-4" style={{ color: BRAND }} />
               <OrdersDropdown
                 items={ordersItems}
                 value={ui.ordersFilter}
@@ -134,14 +167,15 @@ export default function SalesFilters() {
         <div className="flex flex-col gap-1">
           <span className="text-sm leading-none text-muted-foreground">Show:</span>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Order types */}
             <IndicatorToggle
-              icon={(p) => <ConfirmedDocIcon className={p.className} />}
+              icon={ListChecks}
               label="Confirmed Orders"
               pressed={ui.showConfirmed}
               onPressedChange={(v) => ui.setShowConfirmed(v)}
             />
             <IndicatorToggle
-              icon={(p) => <PotentialDocIcon className={p.className} />}
+              icon={Clipboard}
               label="Potential Orders"
               pressed={ui.showPotential}
               onPressedChange={(v) => ui.setShowPotential(v)}
@@ -152,6 +186,8 @@ export default function SalesFilters() {
               pressed={ui.showExpected}
               onPressedChange={(v) => ui.setShowExpected(v)}
             />
+
+            {/* Metrics */}
             <IndicatorToggle
               icon={Boxes}
               label="Quantity"
@@ -170,17 +206,27 @@ export default function SalesFilters() {
               pressed={ui.showPromoLinked}
               onPressedChange={(v) => ui.setShowPromoLinked(v)}
             />
-            <IndicatorToggle
-              icon={User}
-              label="Channel Mix"
-              pressed={ui.showChannelMix}
-              onPressedChange={(v) => ui.setShowChannelMix(v)}
-            />
+
+            {/* Last indicator differs by tab */}
+            {tab === "clients" ? (
+              <IndicatorToggle
+                icon={Sprout}
+                label="Crop Mix"
+                pressed={ui.showCropMix}
+                onPressedChange={(v) => ui.setShowCropMix(v)}
+              />
+            ) : (
+              <IndicatorToggle
+                icon={Users}
+                label="Channel Mix"
+                pressed={ui.showChannelMix}
+                onPressedChange={(v) => ui.setShowChannelMix(v)}
+              />
+            )}
           </div>
         </div>
       </div>
 
-      {/* divider */}
       <div className="mt-3 h-px w-full bg-[#E0F0ED]" />
     </section>
   );

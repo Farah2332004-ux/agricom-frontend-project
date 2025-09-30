@@ -29,6 +29,10 @@ type SalesUI = {
   promotionsFilter: PromoKey[];
   setPromotionsFilter: (v: PromoKey[]) => void;
 
+  /** NEW: flat selection from ClientsDropdown (channel/segment/persona mixed) */
+  clientsSelected: string[];
+  setClientsSelected: (vals: string[]) => void;
+
   // indicators (what to show)
   showConfirmed: boolean;
   setShowConfirmed: (v: boolean) => void;
@@ -43,8 +47,12 @@ type SalesUI = {
   setShowRevenue: (v: boolean) => void;
   showPromoLinked: boolean;
   setShowPromoLinked: (v: boolean) => void;
+
+  /** Crops tab uses Channel Mix; Clients tab uses Crop Mix */
   showChannelMix: boolean;
   setShowChannelMix: (v: boolean) => void;
+  showCropMix: boolean;                   // NEW
+  setShowCropMix: (v: boolean) => void;   // NEW
 
   // week scroller
   weekStart: number;
@@ -72,6 +80,9 @@ export const useSalesUI = create<SalesUI>((set) => ({
   promotionsFilter: [],
   setPromotionsFilter: (promotionsFilter) => set({ promotionsFilter }),
 
+  clientsSelected: [],                                 // NEW
+  setClientsSelected: (vals) => set({ clientsSelected: vals }), // NEW
+
   showConfirmed: true,
   setShowConfirmed: (v) => set({ showConfirmed: v }),
   showPotential: true,
@@ -85,8 +96,11 @@ export const useSalesUI = create<SalesUI>((set) => ({
   setShowRevenue: (v) => set({ showRevenue: v }),
   showPromoLinked: true,
   setShowPromoLinked: (v) => set({ showPromoLinked: v }),
+
   showChannelMix: true,
   setShowChannelMix: (v) => set({ showChannelMix: v }),
+  showCropMix: true,                      // NEW
+  setShowCropMix: (v) => set({ showCropMix: v }), // NEW
 
   weekStart: week,
   window: 16,

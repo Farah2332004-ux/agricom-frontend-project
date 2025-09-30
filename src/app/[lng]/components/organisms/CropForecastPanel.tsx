@@ -39,9 +39,9 @@ function isoWeek(d: Date): number {
 }
 
 type Props = {
-  weeks: number[];           // same weeks from WeekScroller
-  cropLabel: string;         // e.g., "Broccoli"
-  onClose: () => void;       // collapse the whole panel to title only (handled by page)
+  weeks: number[];
+  cropLabel: string;
+  onClose: () => void;
   className?: string;
 };
 
@@ -59,6 +59,28 @@ const demandColor = (v: number) =>
 
 const priceColor = (v: number) =>
   v >= 2.8 ? "#EA4A3C" : v >= 2.3 ? "#F2AE48" : v >= 1.8 ? "#02A78B" : "#7AC4B2";
+
+/* Qualitative phrases that match the colors */
+function demandQualitative(v: number) {
+  const c = demandColor(v);
+  if (c === "#EA4A3C")
+    return { headline: "Demand surge", reason: "sharp uptick expected; plan stock" };
+  if (c === "#F2AE48")
+    return { headline: "Above-average demand", reason: "uptrend vs. recent weeks" };
+  if (c === "#02A78B")
+    return { headline: "Stable demand", reason: "orders in line with plan" };
+  return { headline: "Soft demand", reason: "seasonal slowdown / lower interest" };
+}
+function priceQualitative(v: number) {
+  const c = priceColor(v);
+  if (c === "#EA4A3C")
+    return { headline: "Price peak", reason: "tight supply & strong pull" };
+  if (c === "#F2AE48")
+    return { headline: "Firm pricing", reason: "solid market interest" };
+  if (c === "#02A78B")
+    return { headline: "Healthy pricing", reason: "balanced supply and demand" };
+  return { headline: "Soft pricing", reason: "discount pressure / promos" };
+}
 
 /* ---------------- Subcomponents ---------------- */
 function SegmentedBar({
@@ -80,7 +102,6 @@ function SegmentedBar({
 
   return (
     <div className="relative" style={barOuterStyle}>
-      {/* background bar (striped by segment) */}
       <div className="h-4 rounded-full relative overflow-hidden">
         <div
           className="h-full w-full rounded-full relative"
@@ -95,7 +116,6 @@ function SegmentedBar({
               .join(", ")})`,
           }}
         >
-          {/* segment dividers */}
           {values.slice(0, -1).map((_, i) => (
             <div
               key={`divider-${i}`}
@@ -106,13 +126,10 @@ function SegmentedBar({
         </div>
       </div>
 
-      {/* hit targets + tooltips */}
       {values.map((v, i) => {
         const position = (i / values.length) * 100;
         const width = 100 / values.length;
         const clickable = isClickableIndex(i);
-        const hasWarning = warnings ? warnings(v) : false;
-
         const click = () => clickable && onClickIndex(i);
 
         return (
@@ -134,7 +151,6 @@ function SegmentedBar({
         );
       })}
 
-      {/* warning glyphs (overlay) */}
       {values.map((v, i) => {
         const show = warnings ? warnings(v) : false;
         if (!show) return null;
@@ -169,7 +185,6 @@ function ShortTermStrip({
   return (
     <div className="mt-3 rounded-2xl border bg-white px-4 py-3" style={{ borderColor: BORDER }}>
       <div className="grid grid-cols-4 items-center gap-4">
-        {/* Available Stock */}
         <div className="flex items-center gap-3">
           <Sprout className="h-5 w-5" style={{ color: BRAND }} />
           <div>
@@ -181,7 +196,6 @@ function ShortTermStrip({
           </div>
         </div>
 
-        {/* Total Demand */}
         <div className="flex items-center gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
           <ShoppingCart className="h-5 w-5" style={{ color: BRAND }} />
           <div>
@@ -193,7 +207,6 @@ function ShortTermStrip({
           </div>
         </div>
 
-        {/* Price */}
         <div className="flex items-center gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
           <CircleDollarSign className="h-5 w-5" style={{ color: BRAND }} />
           <div>
@@ -208,7 +221,6 @@ function ShortTermStrip({
           </div>
         </div>
 
-        {/* Order Fulfillment + close */}
         <div className="flex items-center justify-between gap-3 border-l pl-4" style={{ borderColor: BORDER }}>
           <div className="flex items-center gap-3">
             <BadgeCheck className="h-5 w-5" style={{ color: BRAND }} />
@@ -241,7 +253,6 @@ export default function CropForecastPanel({
   const count = weeks?.length ?? 0;
   if (!count) return null;
 
-  // Synthetic series (seeded to weeks/crop for stability)
   const demand = React.useMemo(
     () => seriesInt(count, `dem-${cropLabel}-${weeks.join(",")}`, 420, 1200),
     [count, weeks, cropLabel]
@@ -285,22 +296,55 @@ export default function CropForecastPanel({
     });
   };
 
-  const demandLabel = (v: number, i: number) => (
-    <div className="flex items-start gap-2">
-      <div className="font-medium">Week {weeks[i]} • {isClickableIndex(i) ? "Current" : "Outlook"}</div>
-      <div className="ml-auto tabular-nums">{v} kg</div>
-    </div>
-  );
+  // Hover labels
+  const demandLabel = (v: number, i: number) => {
+    const isCurrent = isClickableIndex(i);
+    if (isCurrent) {
+      return (
+        <>
+          <div className="font-medium">Week {weeks[i]} • Current</div>
+          <div className="mt-1 text-muted-foreground">
+            Demand: <b>{v} kg</b>
+          </div>
+        </>
+      );
+    }
+    const q = demandQualitative(v);
+    return (
+      <>
+        <div className="font-medium">Week {weeks[i]} • Outlook</div>
+        <div className="mt-1 text-muted-foreground">
+          {q.headline} — <span className="italic">due to {q.reason}</span>
+        </div>
+      </>
+    );
+  };
 
-  const priceLabel = (v: number, i: number) => (
-    <div className="flex items-start gap-2">
-      <div className="font-medium">Week {weeks[i]} • {isClickableIndex(i) ? "Current" : "Outlook"}</div>
-      <div className="ml-auto tabular-nums">{v.toFixed(2)} $/kg</div>
-    </div>
-  );
+  const priceLabel = (v: number, i: number) => {
+    const isCurrent = isClickableIndex(i);
+    if (isCurrent) {
+      return (
+        <>
+          <div className="font-medium">Week {weeks[i]} • Current</div>
+          <div className="mt-1 text-muted-foreground">
+            Price: <b>{v.toFixed(2)} $/kg</b>
+          </div>
+        </>
+      );
+    }
+    const q = priceQualitative(v);
+    return (
+      <>
+        <div className="font-medium">Week {weeks[i]} • Outlook</div>
+        <div className="mt-1 text-muted-foreground">
+          {q.headline} — <span className="italic">due to {q.reason}</span>
+        </div>
+      </>
+    );
+  };
 
-  const demandWarn = (v: number) => v >= 1000; // surge
-  const priceWarn = (v: number) => v >= 2.8;   // peak
+  const demandWarn = (v: number) => v >= 1000;
+  const priceWarn = (v: number) => v >= 2.8;
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -309,7 +353,6 @@ export default function CropForecastPanel({
         aria-label="Weekly Crop Forecast"
         style={{ borderColor: BORDER }}
       >
-        {/* Header */}
         <div className="mb-4 flex items-start justify-between">
           <div>
             <div className="text-[15px] font-semibold text-[#02A78B]">
@@ -360,7 +403,6 @@ export default function CropForecastPanel({
           </div>
         </div>
 
-        {/* Short-term strip (only when current week clicked) */}
         {short && (
           <ShortTermStrip
             data={short}
