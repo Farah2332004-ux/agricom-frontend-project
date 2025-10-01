@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { currentISOWeek } from "../components/common/weeks";
 
+/* ---------------- Types for filters ---------------- */
 export type OrderChannelKey =
   | "standing"
   | "online"
@@ -20,18 +21,29 @@ export type PromoKey =
   | "reward"
   | "referral";
 
+/* ---------------- Sales Simulator types ---------------- */
+export type SalesSimBaseline = {
+  salesKg: number;   // baseline expected sales
+  invKg: number;     // baseline expected inventory
+  wasteKg: number;   // baseline expected waste
+  price: number;     // baseline price
+};
+export type SalesSimCtx = {
+  label: string;                         // crop or client label to display
+  weeks: number[];                       // 3-week window around the clicked week
+  baselines: Record<number, SalesSimBaseline>;
+};
+
 type SalesUI = {
   // filters
   selectedCrops: string[];
   setSelectedCrops: (c: string[]) => void;
+
   ordersFilter: OrderChannelKey[];
   setOrdersFilter: (v: OrderChannelKey[]) => void;
+
   promotionsFilter: PromoKey[];
   setPromotionsFilter: (v: PromoKey[]) => void;
-
-  /** NEW: flat selection from ClientsDropdown (channel/segment/persona mixed) */
-  clientsSelected: string[];
-  setClientsSelected: (vals: string[]) => void;
 
   // indicators (what to show)
   showConfirmed: boolean;
@@ -48,11 +60,12 @@ type SalesUI = {
   showPromoLinked: boolean;
   setShowPromoLinked: (v: boolean) => void;
 
-  /** Crops tab uses Channel Mix; Clients tab uses Crop Mix */
+  // NOTE: crops tab had "Channel Mix"; clients tab has "Crop Mix".
+  // We keep both flags so the same schedule component can read them safely.
   showChannelMix: boolean;
   setShowChannelMix: (v: boolean) => void;
-  showCropMix: boolean;                   // NEW
-  setShowCropMix: (v: boolean) => void;   // NEW
+  showCropMix?: boolean;
+  setShowCropMix?: (v: boolean) => void;
 
   // week scroller
   weekStart: number;
@@ -67,9 +80,20 @@ type SalesUI = {
   // primary crop (used when none selected)
   crop: string;
   setCrop: (c: string) => void;
+
+  // clients dropdown (flat selection of keys)
+  clientsSelected: string[];
+  setClientsSelected: (v: string[]) => void;
+
+  /* ---------------- Sales Simulator state ---------------- */
+  salesSimOpen: boolean;
+  salesSimCtx: SalesSimCtx | null;
+  openSalesSimulator: (ctx: SalesSimCtx) => void;
+  closeSalesSimulator: () => void;
 };
 
-const { week } = currentISOWeek(); // local tz
+const { week } = currentISOWeek();
+
 export const useSalesUI = create<SalesUI>((set) => ({
   selectedCrops: [],
   setSelectedCrops: (selectedCrops) => set({ selectedCrops }),
@@ -79,9 +103,6 @@ export const useSalesUI = create<SalesUI>((set) => ({
 
   promotionsFilter: [],
   setPromotionsFilter: (promotionsFilter) => set({ promotionsFilter }),
-
-  clientsSelected: [],                                 // NEW
-  setClientsSelected: (vals) => set({ clientsSelected: vals }), // NEW
 
   showConfirmed: true,
   setShowConfirmed: (v) => set({ showConfirmed: v }),
@@ -99,8 +120,8 @@ export const useSalesUI = create<SalesUI>((set) => ({
 
   showChannelMix: true,
   setShowChannelMix: (v) => set({ showChannelMix: v }),
-  showCropMix: true,                      // NEW
-  setShowCropMix: (v) => set({ showCropMix: v }), // NEW
+  showCropMix: true,
+  setShowCropMix: (v) => set({ showCropMix: v }),
 
   weekStart: week,
   window: 16,
@@ -112,4 +133,12 @@ export const useSalesUI = create<SalesUI>((set) => ({
 
   crop: "Broccoli",
   setCrop: (crop) => set({ crop }),
+
+  clientsSelected: [],
+  setClientsSelected: (v) => set({ clientsSelected: v }),
+
+  salesSimOpen: false,
+  salesSimCtx: null,
+  openSalesSimulator: (ctx) => set({ salesSimOpen: true, salesSimCtx: ctx }),
+  closeSalesSimulator: () => set({ salesSimOpen: false, salesSimCtx: null }),
 }));

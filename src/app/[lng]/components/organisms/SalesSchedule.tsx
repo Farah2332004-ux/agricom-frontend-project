@@ -19,7 +19,7 @@ import {
   Layers, // generic "mix" pictogram
   // order types
   ShoppingBasket,  // standing
-  Receipt,         // online (icon-style)
+  Receipt,         // online
   Mail,            // email
   Landmark,        // institution
   Package,         // pack
@@ -97,7 +97,7 @@ const ORDER_TYPES: CatItem[] = [
   { key: "box",         label: "Box-Based",    Icon: Box },
 ];
 
-// Promotions (keys match PromotionsDropdown values)
+// Promotions
 const PROMO_TYPES: CatItem[] = [
   { key: "discount",  label: "Discount",      Icon: Megaphone },
   { key: "bundle",    label: "Bundle",        Icon: Box },
@@ -117,6 +117,14 @@ const CHANNELS: CatItem[] = [
   { key: "processor",   label: "Processor",     Icon: Factory },
   { key: "association", label: "Association",   Icon: Users },
   { key: "public",      label: "Public Sector", Icon: Building },
+];
+
+// Segments (clients)
+const SEGMENTS: CatItem[] = [
+  { key: "vip",      label: "VIP",          Icon: Users },
+  { key: "family",   label: "High Value",   Icon: Users },
+  { key: "student",  label: "Consistent",   Icon: Users },
+  { key: "business", label: "Occasional",   Icon: Users },
 ];
 
 // Crops for Crop Mix (Clients tab)
@@ -152,56 +160,7 @@ function pickDistribution(seed: string, catalog: CatItem[], minItems=1, maxItems
 const dominant = <T extends {pct:number}>(dist: T[]) =>
   dist.slice().sort((a,b)=>b.pct-a.pct)[0];
 
-/* -------------- UI atoms -------------- */
-function HeaderCell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white text-[12px]" style={{ borderColor: BORDER }}>
-      {children}
-    </div>
-  );
-}
-function ValueCell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white text-[12px]" style={{ borderColor: BORDER }}>
-      {children}
-    </div>
-  );
-}
-function SectionHeading({
-  open, onToggle, Icon, label,
-}: { open: boolean; onToggle: () => void; Icon: React.ElementType; label: string }) {
-  return (
-    <div className="flex h-8 items-center gap-2">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] border transition-transform"
-        style={{ borderColor: BORDER, color: BRAND }}
-      >
-        <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} />
-      </button>
-      <div className="flex items-center gap-2 text-[15px] font-semibold">
-        <Icon className="size-4" style={{ color: BRAND }} />
-        {label}
-      </div>
-    </div>
-  );
-}
-function SubRowLabel({
-  Icon, children, unitLabel,
-}: { Icon: React.ElementType; children: React.ReactNode; unitLabel?: string }) {
-  return (
-    <div className="flex items-center gap-2 px-2 text-[15px]">
-      <span className="inline-flex h-6 w-6 shrink-0" />
-      <Icon className="size-4" style={{ color: BRAND }} />
-      <span>{children}</span>
-      {unitLabel ? <span className="ml-1 text-sm text-muted-foreground">{unitLabel}</span> : null}
-    </div>
-  );
-}
-
-/* ---------- Hover popup card (no arrow), restored ---------- */
+/* ---------- hover popup card ---------- */
 function DistPopupCard({
   title,
   items,
@@ -237,24 +196,121 @@ function DistPopupCard({
   );
 }
 
-/* Icon-only cell with popup on hover */
+/* ---------- helpers for opening simulator ---------- */
+const clampWeek = (w: number) => ((w - 1 + 52) % 52) + 1;
+
+function basePriceFor(groupKey: string, ot: OrderType, w: number) {
+  const q = Math.max(1, valueFor(groupKey, ot, "quantity", w));
+  const r = valueFor(groupKey, ot, "revenue", w);
+  const p = Math.max(1.0, Math.min(2.9, r / q));
+  return Number(p.toFixed(2));
+}
+function baselineFor(groupKey: string, ot: OrderType, w: number) {
+  const q = Math.max(1, valueFor(groupKey, ot, "quantity", w));
+  const price = basePriceFor(groupKey, ot, w);
+  const rnd = rng(`${groupKey}:${ot}:sim:${w}`)();
+  const inv = Math.round(q * (0.10 + rnd * 0.18));
+  const waste = Math.round(q * (0.04 + rnd * 0.06));
+  return { salesKg: q, invKg: inv, wasteKg: waste, price };
+}
+function openSimForWeek(
+  label: string,
+  groupKey: string,
+  ot: OrderType,
+  clickedWeek: number
+) {
+  const ui = useSalesUI.getState();
+  const w1 = clampWeek(clickedWeek);
+  const w2 = clampWeek(clickedWeek + 1);
+  const w3 = clampWeek(clickedWeek + 2);
+  const weeks = [w1, w2, w3];
+  const baselines = Object.fromEntries(
+    weeks.map((w) => [w, baselineFor(groupKey, ot, w)])
+  );
+  ui.openSalesSimulator({ label, weeks, baselines });
+}
+
+/* ---------- UI atoms ---------- */
+function HeaderCell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white text-[12px]" style={{ borderColor: BORDER }}>
+      {children}
+    </div>
+  );
+}
+
+function ValueCell({
+  children,
+  onDoubleClick,
+}: {
+  children: React.ReactNode;
+  onDoubleClick?: () => void;
+}) {
+  return (
+    <div
+      onDoubleClick={onDoubleClick}
+      className={`flex h-8 items-center justify-center rounded-[6px] border bg-white text-[12px] ${
+        onDoubleClick ? "cursor-zoom-in" : ""
+      }`}
+      style={{ borderColor: BORDER }}
+      title={onDoubleClick ? "Double-click to open Sales Simulator" : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionHeading({
+  open, onToggle, Icon, label,
+}: { open: boolean; onToggle: () => void; Icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex h-8 items-center gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] border transition-transform"
+        style={{ borderColor: BORDER, color: BRAND }}
+      >
+        <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} />
+      </button>
+      <div className="flex items-center gap-2 text-[15px] font-semibold">
+        <Icon className="size-4" style={{ color: BRAND }} />
+        {label}
+      </div>
+    </div>
+  );
+}
+function SubRowLabel({
+  Icon, children, unitLabel,
+}: { Icon: React.ElementType; children: React.ReactNode; unitLabel?: string }) {
+  return (
+    <div className="flex items-center gap-2 px-2 text-[15px]">
+      <span className="inline-flex h-6 w-6 shrink-0" />
+      <Icon className="size-4" style={{ color: BRAND }} />
+      <span>{children}</span>
+      {unitLabel ? <span className="ml-1 text-sm text-muted-foreground">{unitLabel}</span> : null}
+    </div>
+  );
+}
+
 function MixCell({
   dist,
   mixIcon: MixIcon,
   show,
   title,
+  onOpenSim,
 }: {
   dist: Array<{ key:string; label:string; pct:number; Icon: React.ElementType }>;
   mixIcon: React.ElementType;
   show: boolean;
   title: string;
+  onOpenSim?: () => void;
 }) {
   if (!show) {
     return (
-      <div
-        className="flex h-8 items-center justify-center rounded-[6px] border bg-white"
-        style={{ borderColor: BORDER }}
-      />
+      <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white"
+           style={{ borderColor: BORDER }} />
     );
   }
   const isMix = dist.length > 1;
@@ -264,8 +320,12 @@ function MixCell({
   return (
     <div className="relative group">
       <div
-        className="flex h-8 items-center justify-center rounded-[6px] border bg-white"
+        onDoubleClick={onOpenSim}
+        className={`flex h-8 items-center justify-center rounded-[6px] border bg-white ${
+          onOpenSim ? "cursor-zoom-in" : ""
+        }`}
         style={{ borderColor: BORDER }}
+        title={onOpenSim ? "Double-click to open Sales Simulator" : undefined}
       >
         <Icon className="h-4 w-4" style={{ color: BRAND }} />
       </div>
@@ -282,7 +342,7 @@ function MixCell({
 }
 
 function NumericRow({
-  label, icon: Icon, unitLabel, weeks, getVal, showCell,
+  label, icon: Icon, unitLabel, weeks, getVal, showCell, onOpenSim,
 }: {
   label: string;
   icon: React.ElementType;
@@ -290,6 +350,7 @@ function NumericRow({
   weeks: number[];
   getVal: (w: number) => number;
   showCell: (w: number) => boolean;
+  onOpenSim?: (w: number) => void;
 }) {
   const vals = weeks.map((w) => (showCell(w) ? getVal(w) : null));
   const total = vals.reduce((acc, v) => acc + (v ?? 0), 0);
@@ -299,7 +360,9 @@ function NumericRow({
       <SubRowLabel Icon={Icon} unitLabel={unitLabel}>{label}</SubRowLabel>
       <div style={weekColsStyle(weeks.length)}>
         {weeks.map((w, i) => (
-          <ValueCell key={`${label}-${w}`}>{vals[i] ?? ""}</ValueCell>
+          <ValueCell key={`${label}-${w}`} onDoubleClick={() => onOpenSim?.(w)}>
+            {vals[i] ?? ""}
+          </ValueCell>
         ))}
       </div>
       <div className="flex h-8 items-center justify-center rounded-[6px] border bg-white text-sm font-semibold" style={{ borderColor: BORDER, color: BRAND }}>
@@ -318,6 +381,7 @@ function MixRow({
   mixIcon: MixIcon,
   showCell,
   titleForPopup,
+  onOpenSim,
 }: {
   rowIcon: React.ElementType;
   label: string;
@@ -327,6 +391,7 @@ function MixRow({
   mixIcon: React.ElementType;
   showCell: (w: number) => boolean;
   titleForPopup: string;
+  onOpenSim?: (w: number) => void;
 }) {
   return (
     <div className="mb-2" style={rowGridStyle()}>
@@ -341,6 +406,7 @@ function MixRow({
               mixIcon={MixIcon}
               show={showCell(w)}
               title={titleForPopup}
+              onOpenSim={() => onOpenSim?.(w)}
             />
           );
         })}
@@ -356,10 +422,9 @@ function MixRow({
 type ClientGroup = { key: string; label: string };
 
 function buildClientGroups(selectedFlat: string[]): ClientGroup[] {
-  // Partition into channel / segment / persona by known keys
   const CHANNEL_KEYS = new Set(CHANNELS.map(x => x.key));
-  const SEGMENT_KEYS = new Set(["vip","family","student","business"]);
-  const PERSONA_KEYS = new Set(["bulk","chef","procurement","health"]);
+  const SEGMENT_KEYS = new Set(SEGMENTS.map(x => x.key));
+  const PERSONA_KEYS = new Set(["bulk","chef","procurement","health"]); // example personas
 
   const selCh = selectedFlat.filter(k => CHANNEL_KEYS.has(k));
   const selSe = selectedFlat.filter(k => SEGMENT_KEYS.has(k));
@@ -372,16 +437,17 @@ function buildClientGroups(selectedFlat: string[]): ClientGroup[] {
   const segments = selSe.length ? selSe : [null];
   const personas = selPe.length ? selPe : [null];
 
-  // label helpers
   const labelOf = (k: string | null): string | null => {
     if (!k) return null;
-    const item =
-      CHANNELS.find(c => c.key === k)
-      || SEGMENTS.find(s => s.key === k)
-      || undefined;
+    const item = CHANNELS.find(c => c.key === k) || SEGMENTS.find(s => s.key === k);
     if (item) return item.label;
-    const p = { bulk:"Bulk Buyer", chef:"Chef/Caterer", procurement:"Procurement", health:"Health-Conscious" } as Record<string,string>;
-    return p[k] ?? null;
+    const pMap: Record<string,string> = {
+      bulk: "Bulk Buyer",
+      chef: "Chef/Caterer",
+      procurement: "Procurement",
+      health: "Health-Conscious",
+    };
+    return pMap[k] ?? null;
   };
 
   const groups: ClientGroup[] = [];
@@ -395,7 +461,6 @@ function buildClientGroups(selectedFlat: string[]): ClientGroup[] {
       }
     }
   }
-  // de-dup
   const seen = new Set<string>();
   return groups.filter(g => (seen.has(g.key) ? false : (seen.add(g.key), true)));
 }
@@ -418,7 +483,6 @@ export default function SalesSchedule() {
   const gateByFilters = ({
     week, groupKey, orderType,
   }: { week: number; groupKey: string; orderType: OrderType }) => {
-    // If no filters applied -> always show
     if (!ordersFilter.length && !promotionsFilter.length) return true;
     const od = pickDistribution(`${groupKey}:${orderType}:orders:${week}`, ORDER_TYPES);
     const pd = pickDistribution(`${groupKey}:${orderType}:promos:${week}`, PROMO_TYPES);
@@ -447,6 +511,9 @@ export default function SalesSchedule() {
           const open = openMap[groupKey] ?? true;
           const headerTotals = weeks.map((w) => valueFor(groupKey, "confirmed", "quantity", w));
           const headerTotal = sum(headerTotals);
+
+          const openFor = (ot: OrderType) => (w: number) =>
+            openSimForWeek(cropName, groupKey, ot, w);
 
           return (
             <React.Fragment key={groupKey}>
@@ -497,6 +564,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"confirmed" })}
                         titleForPopup="Order Type mix"
+                        onOpenSim={openFor("confirmed")}
                       />
 
                       {ui.showQuantity && (
@@ -507,6 +575,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "confirmed", "quantity", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"confirmed" })}
+                          onOpenSim={openFor("confirmed")}
                         />
                       )}
 
@@ -518,6 +587,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "confirmed", "revenue", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"confirmed" })}
+                          onOpenSim={openFor("confirmed")}
                         />
                       )}
 
@@ -531,6 +601,7 @@ export default function SalesSchedule() {
                           mixIcon={Megaphone}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"confirmed" })}
                           titleForPopup="Promotion mix"
+                          onOpenSim={openFor("confirmed")}
                         />
                       )}
 
@@ -544,6 +615,7 @@ export default function SalesSchedule() {
                           mixIcon={Users}
                           showCell={()=> true}
                           titleForPopup="Channel mix"
+                          onOpenSim={openFor("confirmed")}
                         />
                       )}
                     </>
@@ -567,6 +639,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"potential" })}
                         titleForPopup="Order Type mix"
+                        onOpenSim={openFor("potential")}
                       />
                       {ui.showQuantity && (
                         <NumericRow
@@ -576,6 +649,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "potential", "quantity", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"potential" })}
+                          onOpenSim={openFor("potential")}
                         />
                       )}
                       {ui.showRevenue && (
@@ -586,6 +660,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "potential", "revenue", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"potential" })}
+                          onOpenSim={openFor("potential")}
                         />
                       )}
                       {ui.showPromoLinked && (
@@ -598,6 +673,7 @@ export default function SalesSchedule() {
                           mixIcon={Megaphone}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"potential" })}
                           titleForPopup="Promotion mix"
+                          onOpenSim={openFor("potential")}
                         />
                       )}
                       {ui.showChannelMix && (
@@ -610,6 +686,7 @@ export default function SalesSchedule() {
                           mixIcon={Users}
                           showCell={()=> true}
                           titleForPopup="Channel mix"
+                          onOpenSim={openFor("potential")}
                         />
                       )}
                     </>
@@ -633,6 +710,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"expected" })}
                         titleForPopup="Order Type mix"
+                        onOpenSim={openFor("expected")}
                       />
                       {ui.showQuantity && (
                         <NumericRow
@@ -642,6 +720,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "expected", "quantity", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"expected" })}
+                          onOpenSim={openFor("expected")}
                         />
                       )}
                       {ui.showRevenue && (
@@ -652,6 +731,7 @@ export default function SalesSchedule() {
                           weeks={weeks}
                           getVal={(w)=> valueFor(groupKey, "expected", "revenue", w)}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"expected" })}
+                          onOpenSim={openFor("expected")}
                         />
                       )}
                       {ui.showPromoLinked && (
@@ -664,6 +744,7 @@ export default function SalesSchedule() {
                           mixIcon={Megaphone}
                           showCell={(w)=> gateByFilters({ week:w, groupKey, orderType:"expected" })}
                           titleForPopup="Promotion mix"
+                          onOpenSim={openFor("expected")}
                         />
                       )}
                       {ui.showChannelMix && (
@@ -676,6 +757,7 @@ export default function SalesSchedule() {
                           mixIcon={Users}
                           showCell={()=> true}
                           titleForPopup="Channel mix"
+                          onOpenSim={openFor("expected")}
                         />
                       )}
                     </>
@@ -710,7 +792,6 @@ export default function SalesSchedule() {
 
         const gate = (ot: OrderType) => (w: number) =>
           ((): boolean => {
-            // same gating as crops, but reuse catalog seeds under client-key
             if (!(ui.ordersFilter?.length) && !(ui.promotionsFilter?.length)) return true;
             const od = pickDistribution(`${groupKey}:${ot}:orders:${w}`, ORDER_TYPES);
             const pd = pickDistribution(`${groupKey}:${ot}:promos:${w}`, PROMO_TYPES);
@@ -718,6 +799,9 @@ export default function SalesSchedule() {
             const hasPromo = !(ui.promotionsFilter?.length) || pd.some(p => ui.promotionsFilter!.includes(p.key as any));
             return hasOrder && hasPromo;
           })();
+
+        const openFor = (ot: OrderType) => (w: number) =>
+          openSimForWeek(cg.label, groupKey, ot, w);
 
         return (
           <React.Fragment key={groupKey}>
@@ -768,6 +852,7 @@ export default function SalesSchedule() {
                       mixIcon={Layers}
                       showCell={gate("confirmed")}
                       titleForPopup="Order Type mix"
+                      onOpenSim={openFor("confirmed")}
                     />
 
                     {ui.showQuantity && (
@@ -778,6 +863,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "confirmed", "quantity", w)}
                         showCell={gate("confirmed")}
+                        onOpenSim={openFor("confirmed")}
                       />
                     )}
                     {ui.showRevenue && (
@@ -788,6 +874,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "confirmed", "revenue", w)}
                         showCell={gate("confirmed")}
+                        onOpenSim={openFor("confirmed")}
                       />
                     )}
                     {ui.showPromoLinked && (
@@ -800,6 +887,7 @@ export default function SalesSchedule() {
                         mixIcon={Megaphone}
                         showCell={gate("confirmed")}
                         titleForPopup="Promotion mix"
+                        onOpenSim={openFor("confirmed")}
                       />
                     )}
                     {ui.showCropMix && (
@@ -812,6 +900,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={()=> true}
                         titleForPopup="Crop mix"
+                        onOpenSim={openFor("confirmed")}
                       />
                     )}
                   </>
@@ -835,6 +924,7 @@ export default function SalesSchedule() {
                       mixIcon={Layers}
                       showCell={gate("potential")}
                       titleForPopup="Order Type mix"
+                      onOpenSim={openFor("potential")}
                     />
                     {ui.showQuantity && (
                       <NumericRow
@@ -844,6 +934,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "potential", "quantity", w)}
                         showCell={gate("potential")}
+                        onOpenSim={openFor("potential")}
                       />
                     )}
                     {ui.showRevenue && (
@@ -854,6 +945,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "potential", "revenue", w)}
                         showCell={gate("potential")}
+                        onOpenSim={openFor("potential")}
                       />
                     )}
                     {ui.showPromoLinked && (
@@ -866,6 +958,7 @@ export default function SalesSchedule() {
                         mixIcon={Megaphone}
                         showCell={gate("potential")}
                         titleForPopup="Promotion mix"
+                        onOpenSim={openFor("potential")}
                       />
                     )}
                     {ui.showCropMix && (
@@ -878,6 +971,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={()=> true}
                         titleForPopup="Crop mix"
+                        onOpenSim={openFor("potential")}
                       />
                     )}
                   </>
@@ -901,6 +995,7 @@ export default function SalesSchedule() {
                       mixIcon={Layers}
                       showCell={gate("expected")}
                       titleForPopup="Order Type mix"
+                      onOpenSim={openFor("expected")}
                     />
                     {ui.showQuantity && (
                       <NumericRow
@@ -910,6 +1005,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "expected", "quantity", w)}
                         showCell={gate("expected")}
+                        onOpenSim={openFor("expected")}
                       />
                     )}
                     {ui.showRevenue && (
@@ -920,6 +1016,7 @@ export default function SalesSchedule() {
                         weeks={weeks}
                         getVal={(w)=> valueFor(groupKey, "expected", "revenue", w)}
                         showCell={gate("expected")}
+                        onOpenSim={openFor("expected")}
                       />
                     )}
                     {ui.showPromoLinked && (
@@ -932,6 +1029,7 @@ export default function SalesSchedule() {
                         mixIcon={Megaphone}
                         showCell={gate("expected")}
                         titleForPopup="Promotion mix"
+                        onOpenSim={openFor("expected")}
                       />
                     )}
                     {ui.showCropMix && (
@@ -944,6 +1042,7 @@ export default function SalesSchedule() {
                         mixIcon={Layers}
                         showCell={()=> true}
                         titleForPopup="Crop mix"
+                        onOpenSim={openFor("expected")}
                       />
                     )}
                   </>
