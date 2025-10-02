@@ -385,11 +385,6 @@ function ClientForecastPanelComponent({
         <div className="mb-4 flex items-center gap-4">
           <div className="w-40 flex-shrink-0 text-[15px] font-medium" style={{ color: BRAND }}>
             Client Performance
-            {typeof perfHeadline === "number" && (
-              <span className="ml-2 text-[15px] font-semibold text-black">
-                {perfHeadline}%
-              </span>
-            )}
           </div>
           <div className="flex-1">
             <SegmentedBar
